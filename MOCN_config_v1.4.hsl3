@@ -1,0 +1,749 @@
+#version 1.4 MOCN config
+
+
+def WriteToAFile(f, string) 
+    if (IsFile(f)==False)
+        fp1 = Open(f,'a+')
+        #Print(f + ' file has been created!')
+        fp1.close()
+    end  
+    fp = Open(f, "a+")
+    fp.write(string)
+    fp.close()
+end
+def  com(comm,objIndex,col_name1,col_name2,*args)
+        SendMML(comm)
+        rpt=GetMMLReport(-1)
+        p=ParseMMLRpt(rpt)
+        col1=GetColumnByName(p, objIndex, col_name1, 0)
+        col2=GetColumnByName(p, objIndex, col_name2, 0)
+        other_columns_list=[GetColumnByName(p, objIndex, col, 0) for col in args]
+        return col1, col2, other_columns_list
+    end
+
+
+def MOCN_removal(ne,mocn_op)
+    DT_flag=0
+    TF_flag = 0
+    compt_flag=True
+    if ConnectNE(ne)
+        if com('LST NODE:;',0,'Product Type','Working Mode')[1][0]=='ConCurrent'
+            compt_flag=True
+            Print('//CoMPT node '+ne+'\n')
+        else
+            compt_flag=False
+            Print('//Not CoMPT node '+ne+'\n')
+        end
+        if '1' in com('LST CNOPERATOR:;',0,'CN Operator ID','Mobile network code')[0]
+            DT_flag=1
+            Print("//Script for MOCN DT deconfiguration\n")
+        end
+        if '2' in com('LST CNOPERATOR:;',0,'CN Operator ID','Mobile network code')[0]
+            TF_flag=1
+            Print("//Script for MOCN TF deconfiguration\n")
+        end
+        
+        if DT_flag==1 or TF_flag==1
+            Print('RMV CB:RT=ALL;')
+            Print('CFM CB:NAME="MOCN_config",AUTORBKSW=DISABLE;')
+            CellOp_table=com('LST CELLOP:;',0,'Local cell ID','Local tracking area ID','Operator uplink RB used ratio(%)')
+            #Print(CellOp_table)
+            if '39000' not in CellOp_table[1]
+                Print('//DT CELLOP already removed, MOCN radio deactivated\n')
+            end
+            if '40000' not in CellOp_table[1]
+                Print('//TF CELLOP already removed, MOCN radio deactivated\n')
+            end
+            for it in range(0,len(CellOp_table[1]))
+                if CellOp_table[1][it]=='39000'
+                    Print('RMV CELLOP:LOCALCELLID='+CellOp_table[0][it]+',TRACKINGAREAID=39000;')
+                elif CellOp_table[1][it]=='40000'
+                    Print('RMV CELLOP:LOCALCELLID='+CellOp_table[0][it]+',TRACKINGAREAID=40000;')
+                elif CellOp_table[1][it]!='39000' and CellOp_table[1][it]!='40000' and CellOp_table[0][it] in ['0','1','2'] and CellOp_table[2][0][it]=='60'
+                    Print('MOD CELLOP:LOCALCELLID='+CellOp_table[0][it]+',TRACKINGAREAID='+CellOp_table[1][it]+',CELLRESERVEDFOROP=CELL_NOT_RESERVED_FOR_OP,OPULRBUSEDRATIO=16,OPDLRBUSEDRATIO=16;')
+                
+                end
+            end
+            if mocn_op ==1
+                Print('RMV CNOPERATORTA:TRACKINGAREAID=39000;')
+                Print('RMV S1:S1ID=2;')
+                Print('RMV X2:X2ID=1;')
+                Print('RMV CNOPERATOR:CNOPERATORID=1;')
+            elif mocn_op==2
+                Print('RMV CNOPERATORTA:TRACKINGAREAID=40000;')
+                Print('RMV S1:S1ID=2;')
+                Print('RMV X2:X2ID=1;')
+                Print('RMV CNOPERATOR:CNOPERATORID=2;\n')
+            end
+
+            Print('//MOCN configuration deletion commands\n')
+            
+            DT_ipsec_policygrp=''
+            TF_ipsec_policygrp=''
+            if compt_flag==True
+                Interface_table=com('LST INTERFACE:;',0,'Interface ID','User Label')
+                Ipsecbinditf_table=com('LST IPSECBINDITF:;',0,'IPSec Bind Interface ID','Interface ID','Policy Group Name')
+                #Print(Ipsecbinditf_table)
+                for it in range(0,len(Ipsecbinditf_table[0]))
+                    if Ipsecbinditf_table[1][it]=='100'
+                        DT_ipsec_policygrp=Ipsecbinditf_table[2][0][it]
+                        Print('RMV IPSECBINDITF:IPSECBINDITFID='+Ipsecbinditf_table[0][it]+';')
+                    end
+                    if Ipsecbinditf_table[1][it]=='200'
+                        TF_ipsec_policygrp=Ipsecbinditf_table[2][0][it]
+                        Print('RMV IPSECBINDITF:IPSECBINDITFID='+Ipsecbinditf_table[0][it]+';')
+                    end
+                end
+            else
+                Print("//IPSECBIND using vdf policy, no deletion needed")
+                DT_ipsec_policygrp='temp'
+                TF_ipsec_policygrp='temp'
+            end
+            Ipsec_policy_table=com('LST IPSECPOLICY:;',0,'Policy Group Name','IPSec Proposal Name','ACL ID','IPSec Sequence No.')
+            for it in range(0,len(Ipsec_policy_table[0]))
+                if compt_flag==True
+                    if Ipsec_policy_table[0][it]==DT_ipsec_policygrp
+                        Ipsec_prop_name=Ipsec_policy_table[1][it]
+                    end
+                    if Ipsec_policy_table[0][it]==TF_ipsec_policygrp
+                        Ipsec_prop_name=Ipsec_policy_table[1][it]
+                    end
+                else
+                    for ite in range(0,len(Ipsec_policy_table[1]))
+                        if 'DT' in Ipsec_policy_table[1][ite] and '3900' in Ipsec_policy_table[2][0][ite]
+                            Ipsec_prop_name=Ipsec_policy_table[1][ite]
+                            DT_ipsec_policygrp=Ipsec_policy_table[0][ite]
+                        end
+                        if 'TEF' in Ipsec_policy_table[1][ite] and '3800' in Ipsec_policy_table[2][0][ite]
+                            Ipsec_prop_name=Ipsec_policy_table[1][ite]
+                            TF_ipsec_policygrp=Ipsec_policy_table[0][ite]
+                        end
+                    end
+                end
+
+            end
+
+            if DT_ipsec_policygrp!='temp' and '90' in Ipsec_policy_table[2][1]
+                Print('RMV IPSECPOLICY:SPGN="'+DT_ipsec_policygrp+'",SPSN=90;')
+            elif DT_ipsec_policygrp!='temp' and '100' in Ipsec_policy_table[2][1]
+                Print('RMV IPSECPOLICY:SPGN="'+DT_ipsec_policygrp+'",SPSN=100;')
+            end
+            if TF_ipsec_policygrp!='temp' and '200' in Ipsec_policy_table[2][1]
+                Print('RMV IPSECPOLICY:SPGN="'+TF_ipsec_policygrp+'",SPSN=200;')
+            end
+
+            Ikepeer_table=com('LST IKEPEER:;',0,'IKE Peer Name','Remote IP Address','IKE Proposal ID')
+            for it in range(0,len(Ikepeer_table[1]))
+                if '10.149.' in Ikepeer_table[1][it]
+                    Ike_prop_id=Ikepeer_table[2][0][it]
+                    Print('RMV IKEPEER:PEERNAME="'+Ikepeer_table[0][it]+'";')
+                elif '10.155.' in Ikepeer_table[1][it]
+                    Ike_prop_id=Ikepeer_table[2][0][it]
+                    Print('RMV IKEPEER:PEERNAME="'+Ikepeer_table[0][it]+'";')
+                end
+            end
+            #MOD IKEPEER:PEERNAME="s1x2peer",IKEVERSION=IKE_V2,IPVERSION=IPV4,LOCALIP="0.0.0.0",FORCEEXECUTE=YES;
+
+            #modify vdf secgw IKEPEER
+            Print('RMV IKEPROPOSAL:PROPID='+Ike_prop_id+';')
+            Print('RMV IPSECPROPOSAL:PROPNAME="'+Ipsec_prop_name+'";')
+
+            AclRule_table=com('LST ACLRULE:;',0,'ACL ID','Rule ID','Source IP Address')
+            for it in range(0,len(AclRule_table[1]))
+                if '10.149' in AclRule_table[2][0][it]
+                    Acl_id=AclRule_table[0][it]
+                    Print('RMV ACLRULE:ACLID='+AclRule_table[0][it]+',RULEID='+AclRule_table[1][it]+',FORCEEXECUTE=YES;')
+                elif '10.155' in AclRule_table[2][0][it]
+                    Acl_id=AclRule_table[0][it]
+                    Print('RMV ACLRULE:ACLID='+AclRule_table[0][it]+',RULEID='+AclRule_table[1][it]+',FORCEEXECUTE=YES;')
+                end
+            end
+            Print('RMV ACL:ACLID='+Acl_id+';')
+
+            
+            EP_group_table = com('LST EPGROUP:;',0,'End Point Group ID','Peer IP Address')
+            if '100' in EP_group_table[0]
+                Print("RMV EPGROUP:EPGROUPID=100;")
+            elif '200' in EP_group_table[0]
+                Print("RMV EPGROUP:EPGROUPID=200;")
+            end
+            if '101' in EP_group_table[0]
+                Print("RMV EPGROUP:EPGROUPID=101;")
+            elif '201' in EP_group_table[0]
+                Print("RMV EPGROUP:EPGROUPID=201;")
+            end
+
+            EP_group_table_100=com('LST EPGROUP:EPGROUPID=100;',0,'SCTP Host List','SCTP Peer List','User Plane Host List','User Plane Peer List')
+            EP_group_table_101=com('LST EPGROUP:EPGROUPID=101;',0,'SCTP Host List','SCTP Peer List','User Plane Host List','User Plane Peer List')
+
+            if len(EP_group_table_100[1])>0
+                SctpPeer_table_100=EP_group_table_100[1][0].split(',')
+                for it in range(0,len(SctpPeer_table_100))
+                    Print('RMV SCTPPEER:SCTPPEERID='+SctpPeer_table_100[it]+';')
+                    end
+            end
+            if len(EP_group_table_101[1])>0
+                SctpPeer_table_101=EP_group_table_101[1][0].split(',')
+                for it in range(0,len(SctpPeer_table_101))
+                    if SctpPeer_table_101[it]!='NULL'
+                        Print('RMV SCTPPEER:SCTPPEERID='+SctpPeer_table_101[it]+';')
+                    end
+                end
+            end
+
+            
+            EP_group_table_200=com('LST EPGROUP:EPGROUPID=200;',0,'SCTP Host List','SCTP Peer List','User Plane Host List','User Plane Peer List')
+            EP_group_table_201=com('LST EPGROUP:EPGROUPID=201;',0,'SCTP Host List','SCTP Peer List','User Plane Host List','User Plane Peer List')
+
+            if len(EP_group_table_200[1])>0
+                SctpPeer_table_200=EP_group_table_200[1][0].split(',')
+                for it in range(0,len(SctpPeer_table_200))
+                    Print('RMV SCTPPEER:SCTPPEERID='+SctpPeer_table_200[it]+';')
+                    end
+            end
+            if len(EP_group_table_201[1])>0
+                SctpPeer_table_201=EP_group_table_201[1][0].split(',')
+                for it in range(0,len(SctpPeer_table_201))
+                    if SctpPeer_table_201[it]!='NULL'
+                        Print('RMV SCTPPEER:SCTPPEERID='+SctpPeer_table_201[it]+';')
+                    end
+                end
+            end
+
+
+            for it in range(0,len(EP_group_table_100[0]))
+                Print('RMV SCTPHOST:SCTPHOSTID='+EP_group_table_100[0][it]+';')
+                end
+            for it in range(0,len(EP_group_table_101[0]))
+                Print('RMV SCTPHOST:SCTPHOSTID='+EP_group_table_101[0][it]+';')
+                end
+            for it in range(0,len(EP_group_table_200[0]))
+                Print('RMV SCTPHOST:SCTPHOSTID='+EP_group_table_200[0][it]+';')
+                end
+            for it in range(0,len(EP_group_table_201[0]))
+                Print('RMV SCTPHOST:SCTPHOSTID='+EP_group_table_201[0][it]+';')
+                end
+            
+            UserPlane_host_table_100=EP_group_table_100[2][0]
+            UserPlane_host_table_101=EP_group_table_101[2][0]
+            UserPlane_host_table_200=EP_group_table_200[2][0]
+            UserPlane_host_table_201=EP_group_table_201[2][0]
+            if len(UserPlane_host_table_100)>0
+                Print('RMV USERPLANEHOST:UPHOSTID='+UserPlane_host_table_100[0]+';')
+                end
+            if len(UserPlane_host_table_200)>0
+                Print('RMV USERPLANEHOST:UPHOSTID='+UserPlane_host_table_200[0]+';')
+                end
+            if len(EP_group_table_100[2][1])>0
+                UserPlane_peer_table_100=EP_group_table_100[2][1][0].split(',')
+                for it in UserPlane_peer_table_100
+                    if it!='NULL'
+                        Print('RMV USERPLANEPEER:UPPEERID='+it+';')
+                    end
+                end
+            end
+            if len(EP_group_table_101[2][1])>0
+                UserPlane_peer_table_101=EP_group_table_101[2][1][0].split(',')
+                for it in UserPlane_peer_table_101
+                    if it!='NULL'
+                        Print('RMV USERPLANEPEER:UPPEERID='+it+';')
+                    end
+                end
+            end        
+            
+            if len(EP_group_table_200[2][1])>0
+                UserPlane_peer_table_200=EP_group_table_200[2][1][0].split(',')
+                for it in UserPlane_peer_table_200
+                    if it!='NULL'
+                        Print('RMV USERPLANEPEER:UPPEERID='+it+';')
+                    end
+                end
+            end
+                
+            if len(EP_group_table_201[2][1])>0
+                UserPlane_peer_table_201=EP_group_table_201[2][1][0].split(',')
+                for it in UserPlane_peer_table_201
+                    if it!='NULL'
+                        Print('RMV USERPLANEPEER:UPPEERID='+it+';')
+                    end
+                end
+            end
+            
+            
+            Twamp_responder_table=com('LST TWAMPRESPONDER:;',0,'Local IP Address','TWAMP Architecture','Responder Index')
+            for it in range(0, len(Twamp_responder_table[0]))
+                if ('10.149' in Twamp_responder_table[0][it] or '10.155' in Twamp_responder_table[0][it])  and Twamp_responder_table[1][it]=='Light Architecture'
+                    Print('RMV TWAMPRESPONDER:RESPONDERID='+Twamp_responder_table[2][0][it]+';')
+                end
+            end
+
+            if  compt_flag==False
+                VlanClass_table=com('LST VLANCLASS:;',0,'VLAN Group No.','VLAN ID','Traffic Type','User Data Service Priority')
+                for it in range(0,len(VlanClass_table[0]))
+                    if VlanClass_table[1][it]in ['394','384'] and VlanClass_table[2][0][it]=='User Data'
+                        Print('RMV VLANCLASS:VLANGROUPNO='+VlanClass_table[0][it]+',TRAFFIC=USERDATA'+',SRVPRIO='+VlanClass_table[2][1][it]+',FORCEEXECUTE=YES;')
+                    elif VlanClass_table[1][it] in ['394','384'] and VlanClass_table[2][0][it]=='Signaling Data'
+                        Print('RMV VLANCLASS:VLANGROUPNO='+VlanClass_table[0][it]+',TRAFFIC=SIG'+',FORCEEXECUTE=YES;')
+                    elif VlanClass_table[1][it] in ['394','384'] and VlanClass_table[2][0][it]=='Other Data'
+                        Print('RMV VLANCLASS:VLANGROUPNO='+VlanClass_table[0][it]+',TRAFFIC=OTHER'+',FORCEEXECUTE=YES;')
+
+                    end
+                end
+
+                VlanMap_table=com('LST VLANMAP:;',0,'Next Hop IP','Mask')
+                for it in range(0,len(VlanMap_table[0]))
+                    if '10.149' in VlanMap_table[0][it] or '10.155' in VlanMap_table[0][it]
+                        Print('RMV VLANMAP:NEXTHOPIP="'+VlanMap_table[0][it]+'",MASK="'+VlanMap_table[1][it]+'",FORCEEXECUTE=YES;')
+                        end
+                end      
+
+                Iprt_table=com('LST IPRT:;',0,'Route Index','Next Hop IP')
+                for it in range(0,len(Iprt_table[0]))
+                    if '10.149.' in Iprt_table[1][it] or '10.155' in Iprt_table[1][it]
+                        Print('RMV IPRT:RTIDX='+Iprt_table[0][it]+',FORCEEXECUTE=YES;')
+                    end
+                end
+
+                Devip_table=com('LST DEVIP:;',0,'Subrack No.','Port Type','Port No.','IP Address')
+                for it in range(0,len(Devip_table[0]))
+                    if ('10.149.' in Devip_table[2][1][it] or '10.155' in Devip_table[2][1][it]) and Devip_table[1][it]=='Ethernet Port'
+                        Print('RMV DEVIP:SRN='+Devip_table[0][it]+',SN=7,SBT=BASE_BOARD,PT=ETH'+',PN='+Devip_table[2][0][it]+',IP="'+Devip_table[2][1][it]+'";')
+                    elif ('10.149.' in Devip_table[2][1][it] or '10.155' in Devip_table[2][1][it]) and Devip_table[1][it]=='Loopback Interface'
+                        Print('RMV DEVIP:SRN='+Devip_table[0][it]+',SN=7,SBT=BASE_BOARD,PT=LOOPINT'+',PN='+Devip_table[2][0][it]+',IP="'+Devip_table[2][1][it]+'";')
+                    end
+                end
+            elif compt_flag==True
+                #Print('commands for compt Layer3, 2')
+                SrcIprt4_table=com('LST SRCIPROUTE4:;',0,'Source Route Index','Source IP Address')
+                for it in range(0,len(SrcIprt4_table[0]))
+                    if '10.149' in SrcIprt4_table[1][it] or '10.155' in SrcIprt4_table[1][it]
+                        Print('RMV SRCIPROUTE4:SRCRTIDX='+SrcIprt4_table[0][it]+';')
+                    end
+                end
+                Iproute4_table=com('LST IPROUTE4:;',0,'Next Hop IP','Route Index')
+                for it in range(0,len(Iproute4_table[0]))
+                    if '10.149' in Iproute4_table[0][it] or '10.155' in Iproute4_table[0][it]
+                        Print('RMV IPROUTE4:RTIDX='+Iproute4_table[1][it]+',FORCEEXECUTE=YES;')
+                    end
+                end
+                Ipaddr4_table=com('LST IPADDR4:;',0,'Interface ID','IP Address','User Label')
+                #HERE
+                Interface_table=com('LST INTERFACE:;',0,'Interface ID','Port ID','Port Type')
+                for it in range(0,len(Ipaddr4_table[0]))
+                    if '10.149' in Ipaddr4_table[1][it] and Ipaddr4_table[0][it] in ['100','120','121','200','220']
+                        Print('RMV IPADDR4:ITFID='+Ipaddr4_table[0][it]+',IP="'+Ipaddr4_table[1][it]+'";')
+                    end
+                end
+                for it in range(0,len(Ipaddr4_table[0]))
+                    if '10.155' in Ipaddr4_table[1][it] and Ipaddr4_table[0][it] in ['100','120','121','200','220']
+                        Print('RMV IPADDR4:ITFID='+Ipaddr4_table[0][it]+',IP="'+Ipaddr4_table[1][it]+'";')
+                    end
+                end
+                
+                for it in Interface_table[0]
+                    if it in ['100','120','121','200','220']
+                        Print('RMV INTERFACE:ITFID='+it+';')
+                    end
+                end
+                Loopback_table = com('LST LOOPBACK:;',0,'Port ID','Subrack No.')
+                for it in Loopback_table[0]
+                    if it in ['800','810','900']
+                        Print('RMV LOOPBACK:PORTID='+it+';')
+                    end
+                end
+
+            end
+            Print('//Remove MOCN optimization commands:\n')
+            Print('RST APP:AID=1,FOCRST=YES;')
+            Print('// Wait for 10 Seconds for system resources to be ready\n')
+            CellAlgoSw_table=com('LST CELLALGOSWITCH:;',0,'Local cell ID','RAN Sharing Mode Switch')
+            for it in range(0,len(CellAlgoSw_table[0]))
+                if CellAlgoSw_table[0][it] in ['0','1','2'] and CellAlgoSw_table[1][it] =='On'
+                    Print('MOD CELLALGOSWITCH:LOCALCELLID='+CellAlgoSw_table[0][it]+',RANSHAREMODESWITCH=OFF,HoAllowedSwitch=GeranSepOpMobilitySwitch-0;')
+                    Print('MOD CELLALGOEXTSWITCH:LOCALCELLID='+CellAlgoSw_table[0][it]+',OPERATORFUNSWITCH=FLEXIBLE_SHARING_SWITCH-0;')
+                    # Print('MOD CELL:LocalCellId='+CellAlgoSw_table[0][it]+',IntraFreqRanSharingInd=BOOLEAN_FALSE;')
+                    Print('MOD CELLMLB:LOCALCELLID='+CellAlgoSw_table[0][it]+',INTERFREQMLBRANSHAREMODE=NON_SHARING;')
+                end
+            end
+            if mocn_op==1
+                Print('RMV NCELLPLMNLIST:MCC="262",MNC="01",RATTYPE=EUTRAN;')
+            elif mocn_op==2
+                Print('RMV NCELLPLMNLIST:MCC="262",MNC="03",RATTYPE=EUTRAN;')
+            end
+            #Print('MOD GLOBALPROCSWITCH:X2SONLINKSETUPTYPE=X2_OVER_OSS,DIFFOPWITHSAMEMMECSWITCH=OFF,X2BASEDUPTENODEBPOLICY=FreqAddCtrl-1;')
+            Print('MOD GLOBALPROCSWITCH:X2SonLinkSetupType=X2_OVER_OSS,DIFFOPWITHSAMEMMECSWITCH=OFF,X2BasedUptENodeBPolicy=FreqAddCtrl-1,X2BasedUptNcellCfgSwitch=ADD_FREQ_CFG_SW-0;')
+            Print('MOD ENODEBALGOSWITCH:HOMODESWITCH=BlindHoSwitch-0;')
+            if mocn_op==1
+                Print('RMV GERANNETWORKCAPCFG:MCC="262",MNC="01",LAC=4294967295;')
+            elif mocn_op==2
+                Print('RMV GERANNETWORKCAPCFG:MCC="262",MNC="03",LAC=4294967295;')
+            #Print('//Optimization not deleted/not mandatory for removal: EUTRANINTERNFREQ:DLEARFCN=6400 ;CNOPQCIEVENTPARAM for VF ; CELLUEMEASCONTROLCFG; GERAN external objects')
+            end
+            Print('MOD ENODEBSHARINGMODE:ENODEBSHARINGMODE=INDEPENDENT;')
+            App_table=com('LST APP:;',0,'Application ID','Application Type')
+            for it in range(0,len(App_table[0]))
+                if App_table[1][it]=='eNodeB'
+                    Print('RST APP:AID='+App_table[0][it]+',FOCRST=YES;')
+                end
+            end
+            #Print('RST BTSNODE:FOCRST=YES;')
+            #Print(ACT SOFTWARE:OT=NE,SWT=SOFTWARE,SV="BTS3900_5900 V100R017C10SPC230",ATL=eNodeB&gNodeB;)
+            
+        else
+            Print("//No  MOCN configured")
+        end
+    end
+end
+
+
+
+
+def MOCN_DT_addition()
+    #Not implemented
+    Print("//Script for MOCN DT configuration")
+    if ConnectNE(ne) and compt_flag==True
+        
+
+        Print('CFM CB:NAME="No_MOCN_config",AUTORBKSW=DISABLE;')
+        end
+end
+
+def MOCN_TF_addition(ne,CUP_IP,CUP_Inner_CP,CUP_Inner_UP,TF_SeGW)
+    """BB1262, BB1AKB, OB1P14"""
+    Print("//Script for MOCN TF configuration")
+    TF_NextHop_address =  CUP_IP.split('.')[0] +'.'+ CUP_IP.split('.')[1] +'.'+ CUP_IP.split('.')[2] +'.'+ str(int(CUP_IP.split('.')[3]) - 1)
+    TF_flag=0
+    DT_flag=0
+    compt_flag=True
+    newmodel_flag = True
+    region=ne[0]
+    if ConnectNE(ne)
+        if com('LST NODE:;',0,'Product Type','Working Mode')[1][0]=='ConCurrent'
+            compt_flag=True
+            Print('//CoMPT node '+ne+'\n')
+        else
+            compt_flag=False
+            Print('//Not CoMPT node '+ne+'\n')
+        end
+        if com('LST VLANMAP:;',0,'Next Hop IP','VLAN ID')[0]==[]
+            newmodel_flag = True
+            Print('//New Model Transmission node '+ne+'\n')
+        else
+            newmodel_flag = False
+            Print('//Old Model Transmission node '+ne+'\n')
+        end
+
+
+    end
+    TF_Subrack_id_cmd=com('LST SUBRACK:;',0,'Cabinet No.','Subrack No.')
+    TF_Subrack_id=TF_Subrack_id_cmd[1][0]
+    TF_PortID_cmd=com('DSP ETHPORT:SRN='+TF_Subrack_id+';',0,'Port ID','Port Status','Port No.')
+    
+    for i in range(0,len(TF_PortID_cmd[0]))
+        if TF_PortID_cmd[1][i]=='Up'    
+            TF_PortID=TF_PortID_cmd[0][i]
+            end
+    end
+
+    Print('CFM CB:NAME="before_MOCN_TF",AUTORBKSW=DISABLE;')
+
+    if newmodel_flag==True
+        TF_Interface_cmd=com('LST INTERFACE:;',0,'Interface Type','Port ID','VLAN ID')
+        if '800' in TF_Interface_cmd[1] or '801' in TF_Interface_cmd[1]
+            DT_flag=1
+        end
+        Print('ADD LOOPBACK:PORTID=900,SRN='+str(TF_Subrack_id)+',SN=7,USERLABEL="TEF S1/X2_C/U";')
+        Print('ADD INTERFACE:ITFID=200,ITFTYPE=VLAN,PT=ETH,PORTID='+TF_PortID+',VLANID=384,MTU4=1800,IPV6SW=DISABLE,USERLABEL="TEF 4G Outer IP";')
+        if DT_flag==1
+            Print('// Check for Loopback interface resource limitation - already existing 700/701/800/801 on VRF 0 !')
+        end
+        Print('ADD INTERFACE:ITFID=220,ITFTYPE=NORMAL,PT=LOOPINT,PORTID=900,USERLABEL="TEF Inner IP for S1/X2_C/U";')
+        Print('ADD IPADDR4:ITFID=200,IP="'+CUP_IP+'",MASK="255.255.255.252",USERLABEL="TEF 4G Outer IP",FORCEEXECUTE=YES;')
+        Print('ADD IPADDR4:ITFID=220,IP="'+CUP_Inner_CP+'",MASK="255.255.254.0",USERLABEL="TEF Inner IP for S1/X2_C",FORCEEXECUTE=YES;')
+        Print('ADD IPADDR4:ITFID=220,IP="'+CUP_Inner_UP+'",MASK="255.255.254.0",USERLABEL="TEF Inner IP for S1/X2_U",FORCEEXECUTE=YES;')
+
+
+        TF_IPROUTE4_cmd=com('LST IPROUTE4:;',0,'Route Index','Destination IP')
+
+        if '53' in TF_IPROUTE4_cmd[0]
+            Print('// Route ID 53 used.' )
+        end
+        if '54' in TF_IPROUTE4_cmd[0]
+            Print('// Route ID 54 used.' )
+        end
+        if '55' in TF_IPROUTE4_cmd[0]
+            Print('// Route ID 55 used.' )
+        end
+        if '56' in TF_IPROUTE4_cmd[0]
+            Print('// Route ID 56 used.' )
+        end
+        if '57' in TF_IPROUTE4_cmd[0]
+            Print('// Route ID 57 used.' )
+        end
+        if '58' in TF_IPROUTE4_cmd[0]
+            Print('// Route ID 58 used.' )
+        end
+        if region in ['M','H']
+            Print('ADD IPROUTE4:RTIDX=53,DSTIP="'+'10.81.12.197'+'",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+TF_NextHop_address+'",MTUSWITCH=OFF,USERLABEL="TEF_MME",FORCEEXECUTE=YES;')
+            Print('ADD IPROUTE4:RTIDX=54,DSTIP="'+'10.81.14.5'+'",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+TF_NextHop_address+'",MTUSWITCH=OFF,USERLABEL="TEF_MME",FORCEEXECUTE=YES;')
+            Print('ADD IPROUTE4:RTIDX=55,DSTIP="'+'10.81.14.150'+'",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+TF_NextHop_address+'",MTUSWITCH=OFF,USERLABEL="TEF_MME",FORCEEXECUTE=YES;')
+            Print('ADD IPROUTE4:RTIDX=56,DSTIP="'+'10.81.14.174'+'",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+TF_NextHop_address+'",MTUSWITCH=OFF,USERLABEL="TEF_MME",FORCEEXECUTE=YES;')
+            end
+
+        if region in ['O', 'B']
+            Print('ADD IPROUTE4:RTIDX=53,DSTIP="'+'10.81.12.133'+'",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+TF_NextHop_address+'",MTUSWITCH=OFF,USERLABEL="TEF_MME",FORCEEXECUTE=YES;')
+            Print('ADD IPROUTE4:RTIDX=54,DSTIP="'+'10.81.13.5'+'",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+TF_NextHop_address+'",MTUSWITCH=OFF,USERLABEL="TEF_MME",FORCEEXECUTE=YES;')
+            Print('ADD IPROUTE4:RTIDX=55,DSTIP="'+'10.81.14.69'+'",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+TF_NextHop_address+'",MTUSWITCH=OFF,USERLABEL="TEF_MME",FORCEEXECUTE=YES;')
+            Print('ADD IPROUTE4:RTIDX=56,DSTIP="'+'10.81.14.134'+'",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+TF_NextHop_address+'",MTUSWITCH=OFF,USERLABEL="TEF_MME",FORCEEXECUTE=YES;')
+            Print('ADD IPROUTE4:RTIDX=57,DSTIP="'+'10.81.13.198'+'",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+TF_NextHop_address+'",MTUSWITCH=OFF,USERLABEL="TEF_MME",FORCEEXECUTE=YES;')
+
+        end
+
+        Print('ADD IPROUTE4:RTIDX=58,DSTIP="'+TF_SeGW+'",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+TF_NextHop_address+'",MTUSWITCH=OFF,USERLABEL="TEF_SecGW",FORCEEXECUTE=YES;')
+
+        Print('ADD SRCIPROUTE4:SRCRTIDX=6,SRCIP="'+CUP_IP+'",RTTYPE=NEXTHOP,NEXTHOP="'+TF_NextHop_address+'",USERLABEL="TEF OuterIP to Nexthop";')
+        Print('ADD SRCIPROUTE4:SRCRTIDX=7,SRCIP="'+CUP_Inner_CP+'",RTTYPE=NEXTHOP,NEXTHOP="'+TF_NextHop_address+'",USERLABEL="TEF S1/X2_C to MME";')
+        Print('ADD SRCIPROUTE4:SRCRTIDX=8,SRCIP="'+CUP_Inner_UP+'",RTTYPE=NEXTHOP,NEXTHOP="'+TF_NextHop_address+'",USERLABEL="TEF S1/X2_U to SGW";')
+        
+    elif newmodel_flag==False
+
+
+        Print('ADD DEVIP:SRN='+TF_Subrack_id+',SN=7,SBT=BASE_BOARD,PT=ETH,PN='+TF_PortID_cmd[2][0][0]+',IP="'+CUP_IP+'",MASK="255.255.255.252",USERLABEL="TEF 4G Outer IP",FORCEEXECUTE=YES;')
+        # Print('ADD DEVIP:SRN='+TF_Subrack_id+',SN=7,SBT=BASE_BOARD,PT=ETH,PN='+TF_PortID_cmd[2][0][0]+',IP="'+CUP_Inner_CP+'",MASK="255.255.255.252",USERLABEL="TEF Inner IP for S1/X2_C",FORCEEXECUTE=YES;')
+        # Print('ADD DEVIP:SRN='+TF_Subrack_id+',SN=7,SBT=BASE_BOARD,PT=ETH,PN='+TF_PortID_cmd[2][0][0]+',IP="'+CUP_Inner_UP+'",MASK="255.255.255.252",USERLABEL="TEF Inner IP for S1/X2_U",FORCEEXECUTE=YES;')
+
+        Print('ADD DEVIP:SRN='+TF_Subrack_id+',SN=7,SBT=BASE_BOARD,PT=LOOPINT,PN=2,IP="'+CUP_Inner_CP+'",MASK="255.255.254.0",USERLABEL="TEF Inner IP for S1/X2_C",FORCEEXECUTE=YES;')
+        Print('ADD DEVIP:SRN='+TF_Subrack_id+',SN=7,SBT=BASE_BOARD,PT=LOOPINT,PN=2,IP="'+CUP_Inner_UP+'",MASK="255.255.254.0",USERLABEL="TEF Inner IP for S1/X2_U",FORCEEXECUTE=YES;')
+
+        TF_IPRT_cmd=com('LST IPRT:;',0,'Route Index','Destination IP')
+        if '53' in TF_IPRT_cmd[0]
+            Print('// Route ID 53 used.' )
+        end
+        if '54' in TF_IPRT_cmd[0]
+            Print('// Route ID 54 used.' )
+        end
+        if '55' in TF_IPRT_cmd[0]
+            Print('// Route ID 55 used.' )
+        end
+        if '56' in TF_IPRT_cmd[0]
+            Print('// Route ID 56 used.' )
+        end
+        if '57' in TF_IPRT_cmd[0]
+            Print('// Route ID 57 used.' )
+        end
+        if '58' in TF_IPRT_cmd[0]
+            Print('// Route ID 58 used.' )
+        end
+
+        if region in ['M', 'H']
+            Print('ADD IPRT:RTIDX=53,SRN='+TF_Subrack_id+',SN=7,SBT=BASE_BOARD,DSTIP="10.81.12.197",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+TF_NextHop_address+'",MTUSWITCH=OFF,DESCRI="TEF_MME",FORCEEXECUTE=YES;')
+            Print('ADD IPRT:RTIDX=54,SRN='+TF_Subrack_id+',SN=7,SBT=BASE_BOARD,DSTIP="10.81.14.5",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+TF_NextHop_address+'",MTUSWITCH=OFF,DESCRI="TEF_MME",FORCEEXECUTE=YES;')
+            Print('ADD IPRT:RTIDX=55,SRN='+TF_Subrack_id+',SN=7,SBT=BASE_BOARD,DSTIP="10.81.14.150",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+TF_NextHop_address+'",MTUSWITCH=OFF,DESCRI="TEF_MME",FORCEEXECUTE=YES;')
+            Print('ADD IPRT:RTIDX=56,SRN='+TF_Subrack_id+',SN=7,SBT=BASE_BOARD,DSTIP="10.81.14.174",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+TF_NextHop_address+'",MTUSWITCH=OFF,DESCRI="TEF_MME",FORCEEXECUTE=YES;')
+            end
+        if region in ['O','B']
+            Print('ADD IPRT:RTIDX=53,SRN='+TF_Subrack_id+',SN=7,SBT=BASE_BOARD,DSTIP="10.81.12.133",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+TF_NextHop_address+'",MTUSWITCH=OFF,DESCRI="TEF_MME",FORCEEXECUTE=YES;')
+            Print('ADD IPRT:RTIDX=54,SRN='+TF_Subrack_id+',SN=7,SBT=BASE_BOARD,DSTIP="10.81.13.5",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+TF_NextHop_address+'",MTUSWITCH=OFF,DESCRI="TEF_MME",FORCEEXECUTE=YES;')
+            Print('ADD IPRT:RTIDX=55,SRN='+TF_Subrack_id+',SN=7,SBT=BASE_BOARD,DSTIP="10.81.14.69",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+TF_NextHop_address+'",MTUSWITCH=OFF,DESCRI="TEF_MME",FORCEEXECUTE=YES;')
+            Print('ADD IPRT:RTIDX=56,SRN='+TF_Subrack_id+',SN=7,SBT=BASE_BOARD,DSTIP="10.81.14.134",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+TF_NextHop_address+'",MTUSWITCH=OFF,DESCRI="TEF_MME",FORCEEXECUTE=YES;')
+            Print('ADD IPRT:RTIDX=57,SRN='+TF_Subrack_id+',SN=7,SBT=BASE_BOARD,DSTIP="10.81.13.198",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+TF_NextHop_address+'",MTUSWITCH=OFF,DESCRI="TEF_MME",FORCEEXECUTE=YES;')
+
+        end
+
+        Print('ADD IPRT:RTIDX=58,SRN='+TF_Subrack_id+',SN=7,SBT=BASE_BOARD,DSTIP="'+TF_SeGW+'",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+TF_NextHop_address+'",MTUSWITCH=OFF,DESCRI="TEF_SecGW",FORCEEXECUTE=YES;\n')
+
+
+        Print('// Not in the LLD: ')
+        Print('ADD VLANMAP:NEXTHOPIP="'+TF_NextHop_address+'",MASK="255.255.255.0",VLANMODE=VLANGROUP,VLANGROUPNO=2,FORCEEXECUTE=YES;')
+        Print('ADD VLANCLASS:VLANGROUPNO=2,TRAFFIC=USERDATA,SRVPRIO=0,VLANID=384,VLANPRIO=0;')
+        Print('ADD VLANCLASS:VLANGROUPNO=2,TRAFFIC=USERDATA,SRVPRIO=10,VLANID=384,VLANPRIO=1;')
+        Print('ADD VLANCLASS:VLANGROUPNO=2,TRAFFIC=USERDATA,SRVPRIO=26,VLANID=384,VLANPRIO=3;')
+        Print('ADD VLANCLASS:VLANGROUPNO=2,TRAFFIC=USERDATA,SRVPRIO=34,VLANID=384,VLANPRIO=4;')
+        Print('ADD VLANCLASS:VLANGROUPNO=2,TRAFFIC=USERDATA,SRVPRIO=40,VLANID=384,VLANPRIO=5;')
+        Print('ADD VLANCLASS:VLANGROUPNO=2,TRAFFIC=USERDATA,SRVPRIO=46,VLANID=384,VLANPRIO=5;')
+        Print('ADD VLANCLASS:VLANGROUPNO=2,TRAFFIC=USERDATA,SRVPRIO=48,VLANID=384,VLANPRIO=6;')
+        Print('ADD VLANCLASS:VLANGROUPNO=2,TRAFFIC=USERDATA,SRVPRIO=63,VLANID=384,VLANPRIO=0;')
+        Print('ADD VLANCLASS:VLANGROUPNO=2,TRAFFIC=SIG,VLANID=384,VLANPRIO=6;')
+        Print('ADD VLANCLASS:VLANGROUPNO=2,TRAFFIC=OTHER,VLANID=384,VLANPRIO=1;\n')
+    end
+
+    Print('ADD TWAMPRESPONDER:RESPONDERID=6,IPVERSION=IPv4,LOCALIP="'+CUP_IP+'",TWAMPARCH=LIGHT,LIGHTLOCALUDPPORT=64679;')
+    Print('ADD TWAMPRESPONDER:RESPONDERID=7,IPVERSION=IPv4,LOCALIP="'+CUP_Inner_UP+'",TWAMPARCH=LIGHT,LIGHTLOCALUDPPORT=64679;')
+
+    Print('ADD SCTPTEMPLATE:SCTPTEMPLATEID=1,SWITCHBACKFLAG=ENABLE,MAXSTREAM=16,DSCPSW=OFF;')
+
+    Print('ADD SCTPHOST:SCTPHOSTID=310,IPVERSION=IPv4,SIGIP1V4="'+CUP_Inner_CP+'",SIGIP1SECSWITCH=DISABLE,SIGIP2SECSWITCH=DISABLE,PN=36412,SIMPLEMODESWITCH=SIMPLE_MODE_OFF,SCTPTEMPLATEID=1,DTLSPOLICYID=NULL,USERLABEL="S1";')
+    Print('ADD SCTPHOST:SCTPHOSTID=311,IPVERSION=IPv4,SIGIP1V4="'+CUP_Inner_CP+'",SIGIP1SECSWITCH=DISABLE,SIGIP2SECSWITCH=DISABLE,PN=36422,SIMPLEMODESWITCH=SIMPLE_MODE_OFF,SCTPTEMPLATEID=1,DTLSPOLICYID=NULL,USERLABEL="X2";')
+
+
+    if region in ['M','H']
+        Print('ADD SCTPPEER:SCTPPEERID=10000,IPVERSION=IPv4,SIGIP1V4="'+'10.81.12.197'+'",SIGIP1SECSWITCH=DISABLE,SIGIP2SECSWITCH=DISABLE,PN=36412,SIMPLEMODESWITCH=SIMPLE_MODE_OFF,USERLABEL="TEF MME 0";')
+        Print('ADD SCTPPEER:SCTPPEERID=10001,IPVERSION=IPv4,SIGIP1V4="'+'10.81.14.5'+'",SIGIP1SECSWITCH=DISABLE,SIGIP2SECSWITCH=DISABLE,PN=36412,SIMPLEMODESWITCH=SIMPLE_MODE_OFF,USERLABEL="TEF MME 1";')
+        Print('ADD SCTPPEER:SCTPPEERID=10002,IPVERSION=IPv4,SIGIP1V4="'+'10.81.14.150'+'",SIGIP1SECSWITCH=DISABLE,SIGIP2SECSWITCH=DISABLE,PN=36412,SIMPLEMODESWITCH=SIMPLE_MODE_OFF,USERLABEL="TEF MME 2";')
+        Print('ADD SCTPPEER:SCTPPEERID=10003,IPVERSION=IPv4,SIGIP1V4="'+'10.81.14.174'+'",SIGIP1SECSWITCH=DISABLE,SIGIP2SECSWITCH=DISABLE,PN=36412,SIMPLEMODESWITCH=SIMPLE_MODE_OFF,USERLABEL="TEF MME 3";')
+    end
+    if region in  ['O','B']
+        Print('ADD SCTPPEER:SCTPPEERID=10000,IPVERSION=IPv4,SIGIP1V4="'+'10.81.12.133'+'",SIGIP1SECSWITCH=DISABLE,SIGIP2SECSWITCH=DISABLE,PN=36412,SIMPLEMODESWITCH=SIMPLE_MODE_OFF,USERLABEL="TEF MME 0";')
+        Print('ADD SCTPPEER:SCTPPEERID=10001,IPVERSION=IPv4,SIGIP1V4="'+'10.81.13.5'+'",SIGIP1SECSWITCH=DISABLE,SIGIP2SECSWITCH=DISABLE,PN=36412,SIMPLEMODESWITCH=SIMPLE_MODE_OFF,USERLABEL="TEF MME 1";')
+        Print('ADD SCTPPEER:SCTPPEERID=10002,IPVERSION=IPv4,SIGIP1V4="'+'10.81.14.69'+'",SIGIP1SECSWITCH=DISABLE,SIGIP2SECSWITCH=DISABLE,PN=36412,SIMPLEMODESWITCH=SIMPLE_MODE_OFF,USERLABEL="TEF MME 2";')
+        Print('ADD SCTPPEER:SCTPPEERID=10003,IPVERSION=IPv4,SIGIP1V4="'+'10.81.14.134'+'",SIGIP1SECSWITCH=DISABLE,SIGIP2SECSWITCH=DISABLE,PN=36412,SIMPLEMODESWITCH=SIMPLE_MODE_OFF,USERLABEL="TEF MME 3";')
+        Print('ADD SCTPPEER:SCTPPEERID=10004,IPVERSION=IPv4,SIGIP1V4="'+'10.81.13.198'+'",SIGIP1SECSWITCH=DISABLE,SIGIP2SECSWITCH=DISABLE,PN=36412,SIMPLEMODESWITCH=SIMPLE_MODE_OFF,USERLABEL="TEF MME 4";')
+    end
+    Print('ADD USERPLANEHOST:UPHOSTID=310,IPVERSION=IPv4,LOCIPV4="'+CUP_Inner_UP+'",IPSECSWITCH=DISABLE,USERLABEL="TEF 4G Inner IP for S1/X2_U";')
+
+    Print('ADD EPGROUP:EPGROUPID=200,USERLABEL="TEF S1",IPPMSWITCH=DISABLE,APPTYPE=NULL,IPVERPREFERENCE=IPv4;')
+    Print('ADD EPGROUP:EPGROUPID=201,USERLABEL="TEF X2",IPPMSWITCH=DISABLE,APPTYPE=NULL,IPVERPREFERENCE=IPv4;')
+    Print('ADD SCTPHOST2EPGRP:EPGROUPID=200,SCTPHOSTID=310;')
+    Print('ADD SCTPHOST2EPGRP:EPGROUPID=201,SCTPHOSTID=311;')
+
+    if region in ['M','H']
+        Print('ADD SCTPPEER2EPGRP:EPGROUPID=200,SCTPPEERID=10000;')
+        Print('ADD SCTPPEER2EPGRP:EPGROUPID=200,SCTPPEERID=10001;')
+        Print('ADD SCTPPEER2EPGRP:EPGROUPID=200,SCTPPEERID=10002;')
+        Print('ADD SCTPPEER2EPGRP:EPGROUPID=200,SCTPPEERID=10003;')
+    end
+    if region in ['O','B']
+        Print('ADD SCTPPEER2EPGRP:EPGROUPID=200,SCTPPEERID=10000;')
+        Print('ADD SCTPPEER2EPGRP:EPGROUPID=200,SCTPPEERID=10001;')
+        Print('ADD SCTPPEER2EPGRP:EPGROUPID=200,SCTPPEERID=10002;')
+        Print('ADD SCTPPEER2EPGRP:EPGROUPID=200,SCTPPEERID=10003;')
+        Print('ADD SCTPPEER2EPGRP:EPGROUPID=200,SCTPPEERID=10004;')
+    end
+
+    Print('ADD UPHOST2EPGRP:EPGROUPID=200,UPHOSTID=310;')
+    Print('ADD UPHOST2EPGRP:EPGROUPID=201,UPHOSTID=310;')
+
+    Print('ADD ACL:ACLID=3800,ACLDESC="S1X2 peer for TEF eNodeB";')
+    Print('ADD ACLRULE:ACLID=3800,RULEID=61,PT=IP,SIP="'+CUP_Inner_CP+'",SWC="0.0.0.0",DIP="0.0.0.0",DWC="255.255.255.255",MDSCP=NO,FORCEEXECUTE=YES;')
+    Print('ADD ACLRULE:ACLID=3800,RULEID=71,PT=IP,SIP="'+CUP_Inner_UP+'",SWC="0.0.0.0",DIP="0.0.0.0",DWC="255.255.255.255",MDSCP=NO,FORCEEXECUTE=YES;')
+
+
+    Print('ADD IKEPROPOSAL:PROPID=92,ENCALG=AES256,AUTHALG=SHA1,AUTHMETH=IKE_CERT_SIG,DHGRP=DH_GROUP14,PRFALG=HMAC_SHA1,REAUTHSW=OFF;')
+    # Print('ADD IKEPEER:PEERNAME="TEF s1x2peer",PROPID=92,IKEVERSION=IKE_V2,IPVERSION=IPV4,IDTYPE=FQDN,REMOTEIP="'+TF_SeGW+'",DPD=PERIODIC,REDUNDANCYFLAG=NONE,CERTSOURCE=APPCERT,IPSECPREFRGSW=OFF,IKEV2FRGSW=OFF;')
+    Print('// TBD: IKEPEER.IDTYPE: IPV4(other sites already MocnTF) vs FQDN(in LLD)')
+    Print('ADD IKEPEER:PEERNAME="TEF s1x2peer",PROPID=92,IKEVERSION=IKE_V2,IPVERSION=IPV4,IDTYPE=IPV4,REMOTEIP="'+TF_SeGW+'",DPD=PERIODIC,LOCALIP="'+CUP_IP+'",REDUNDANCYFLAG=NONE,CERTSOURCE=APPCERT,IPSECPREFRGSW=OFF,IKEV2FRGSW=OFF;')
+   #Print('ADD IKEPEER:PEERNAME="TEF s1x2peer",PROPID=92,IKEVERSION=IKE_V2,IPVERSION=IPV4,IDTYPE=FQDN,REMOTEIP="'+TF_SeGW+'",DPD=PERIODIC,LOCALIP="'+CUP_IP+'",REDUNDANCYFLAG=NONE,CERTSOURCE=APPCERT,IPSECPREFRGSW=OFF,IKEV2FRGSW=OFF;')
+    Print('ADD IPSECPROPOSAL:PROPNAME="4G IPSec TEF",TRANMODE=ESP,ESPENCALG=AES256,ESPAUTHALG=SHA1;')
+    if newmodel_flag ==True
+        Print('ADD IPSECPOLICY:SPGN="4G_Policy_TEF",SPSN=200,ACLTYPE=IPV4,ACLID=3800,PROPNAME="4G IPSec TEF",PEERNAME="TEF s1x2peer",PFS=DISABLE,LTCFG=LOCAL,LTS=43200,LTKB=69120000,REPLAYWND=WND_DISABLE,FORCEEXECUTE=YES;')
+        Print('ADD IPSECBINDITF:IPSECBINDITFID=3,SPGN="4G_Policy_TEF",ITFID=200,FORCEEXECUTE=YES;')
+    else
+        Print('ADD IPSECPOLICY:SPGN="policy",SPSN=200,ACLTYPE=IPV4,ACLID=3800,PROPNAME="4G IPSec TEF",PEERNAME="TEF s1x2peer",PFS=DISABLE,LTCFG=LOCAL,LTS=43200,LTKB=69120000,REPLAYWND=WND_DISABLE,FORCEEXECUTE=YES;')
+    end
+
+    Print('MOD ENODEBSHARINGMODE:ENODEBSHARINGMODE=SHARED_FREQ;')
+    Print('RST APP:AID=1,FOCRST=YES;\n\n')
+    Print('// Please wait 20s for system syncronization before adding CNOPERATOR..\n\n')
+    # 'To be reviewed during FSA if we use DT or VDF values for OPERATORFUNSWITCH'
+    #  'Currently used in the script: DT format'
+    Print('ADD CNOPERATOR:CNOPERATORID=2,CNOPERATORNAME="TEF",CNOPERATORTYPE=CNOPERATOR_SECONDARY,MCC="262",MNC="03",OPERATORFUNSWITCH=CELL_TRAFFIC_TRACE_MSG_SWITCH-1&DCN_SUPPORT_SWITCH-0&MME_STRICT_SELECTION_SWITCH-0&CMAS_BROADCAST_SWITCH-1&ARP_QCI_BASED_DIFF_SCH_SW-0&UPPER_LYR_IND_NO_BROADCAST_SW-1&INTRA_RAT_INTER_PLMN_HO_SW-1&UTRAN_INTER_PLMN_HO_SW-1&GERAN_INTER_PLMN_HO_SW-1&NR_INTER_PLMN_HO_SW-1&VOLTE_HO_NR_DELAY_TIMER_SW-0;')
+
+    Print('\n')
+    Print('ADD S1:S1ID=2,CNOPERATORID=2,EPGROUPCFGFLAG=CP_UP_CFG,CPEPGROUPID=200,UPEPGROUPID=200,MMERELEASE=Release_R13;')
+    Print('ADD X2:X2ID=1,CNOPERATORID=2,EPGROUPCFGFLAG=CP_UP_CFG,CPEPGROUPID=201,UPEPGROUPID=201;')
+
+    Print('\n// (TBD) Backup commands needed for MOCN, but could be included in Com5: ')
+    Print('ADD GERANNETWORKCAPCFG:MCC="262",MNC="03",LAC=4294967295,NETWORKCAPCFG=SiByRimCapCfg-0&UltraFlashCsfbCapCfg-0&SrvccCapCfg-0;')
+    Print('ADD NCELLPLMNLIST:MCC="262",MNC="03",RATTYPE=EUTRAN;')
+    Print('MOD ENODEBALGOSWITCH:HOMODESWITCH=BlindHoSwitch-1;')
+    Print('MOD GLOBALPROCSWITCH:X2SONLINKSETUPTYPE=X2_OVER_S1,DIFFOPWITHSAMEMMECSWITCH=ON,X2BASEDUPTENODEBPOLICY=FreqAddCtrl-0,X2BASEDUPTNCELLCFGSWITCH=ADD_FREQ_CFG_SW-0;')
+    Print('ADD CNOPERATORTA:TRACKINGAREAID=40000,CNOPERATORID=2,TAC='+str(Tac_Tf)+';')
+end
+
+def MOCN_NE_query(op)
+    NE_list=GetNELstByType('BTS3900 LTE')+GetNELstByType('BTS5900 LTE')+GetNELstByType('BTS5900')
+    NE_list__dt_mocn = []
+    NE_list__tf_mocn = []
+    if op == '1'
+        Print("DT NE list:")
+    elif  op == '2'
+        Print("TF NE list:")
+    end
+    for it in NE_list
+        if ConnectNE(it)
+            com1=com('LST CNOPERATOR:;',0,'CN Operator ID','CN Operator name')[0]
+            if str(op) == '1' and op in com1
+                NE_list__dt_mocn.append(it)
+                Print(it)
+            end
+            if str(op) == '2' and op in com1
+                NE_list__tf_mocn.append(it)
+                Print(it)
+            end
+        end
+    end
+    Print(NE_list_mocn)
+    
+end
+
+
+#form1 = CreateForm('MOCN process',[])
+
+#Label(form1, 180, ' ')
+
+#Form1_DT_decom=CheckBox(form1, 450, "Enter MOCN DT decommissioning\n")
+#Form2_DT_con=CheckBox(form1, 450, "Enter MOCN DT configuration\n")
+#Enter(form1)
+#userSelect = ShowForm(form1)
+
+#form0=CreateForm('MOCN process', ['Confirm', 'Cancel'])
+form1 = CreateForm('MOCN process', ['Confirm', 'Cancel'])
+Label(form1,150, "\nSite name:")
+hEditNE = Edit(form1, 200)
+Enter(form1)
+choices = ['MOCN DT decommisioning','MOCN TF configuration','MOCN TF decommisioning']  
+caption = 'Scenario'  
+hRadio1=RadioBoxGroup(form1, 220, choices, caption,[1,[False]]) 
+
+form2=CreateForm('TF Local IPv4 addresses', ['Confirm', 'Cancel'])
+Enter(form2)
+Label(form2,180, "\nMOCN_CUP_IP:")
+hEdit_CUP_IP=Edit(form2, 200)
+Enter(form2)
+Label(form2,180, "\nMOCN_CUP_INNER_CP_IP:")
+hEdit_CUP_Inner_CP=Edit(form2, 200)
+Enter(form2)
+Label(form2,180, "\nMOCN_CUP_INNER_UP_IP:")
+hEdit_CUP_Inner_UP=Edit(form2, 200)
+Enter(form2)
+Label(form2,180,"\nMOCN_SecGW_IP")
+hEdit_TF_SeGW=Edit(form2, 200)
+Enter(form2)
+Label(form2,180,"\nMOCN_TAC")
+hEdit_TF_Tac=Edit(form2, 200)
+
+Enter(form1)
+          
+userSelect = ShowForm(form1)
+
+if GetValue(hRadio1) == 0 
+    if userSelect=="Confirm"
+        ne1=GetValue(hEditNE)
+        MOCN_removal(ne1,1)
+    end
+elif GetValue(hRadio1) == 1
+    if userSelect=="Confirm"
+        userSelect1 = ShowForm(form2)
+        # userSelect = ShowForm(form1)
+        ne1=GetValue(hEditNE)
+        CUP_IP=GetValue(hEdit_CUP_IP)
+        CUP_Inner_CP=GetValue(hEdit_CUP_Inner_CP)
+        CUP_Inner_UP=GetValue(hEdit_CUP_Inner_UP)
+        TF_SeGW=GetValue(hEdit_TF_SeGW)
+        Tac_Tf = GetValue(hEdit_TF_Tac)
+
+        MOCN_TF_addition(ne1,CUP_IP,CUP_Inner_CP,CUP_Inner_UP,TF_SeGW)
+    end
+elif GetValue(hRadio1) == 2
+    if userSelect=="Confirm"
+        ne1=GetValue(hEditNE)
+        MOCN_removal(ne1,2)
+    end
+end
+if userSelect == "Cancel"
+    userSelect = ShowForm(form1)
+end
+#main
+
+# MOCN_NE_query('1')
+#MOCN_NE_query('2')

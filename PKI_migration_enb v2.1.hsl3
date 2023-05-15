@@ -1,0 +1,255 @@
+#version 2.1
+opcox_user='vmihai1'
+vdf_mail='valentin.mihai@vodafone.com'
+
+def WriteToAFile(f, string) 
+    if (IsFile(f)==False)
+        fp1 = Open(f,'a+')
+        #Print(f + ' file has been created!')
+        fp1.close()
+    end  
+    fp = Open(f, "a+")
+    fp.write(string)
+    # Print(string.strip('\n'))
+    fp.close()
+end
+def  com(comm,objIndex,col_name1,col_name2,*args)
+    SendMML(comm)
+    rpt=GetMMLReport(-1)
+    p=ParseMMLRpt(rpt)
+    col1=GetColumnByName(p, objIndex, col_name1, 0)
+    col2=GetColumnByName(p, objIndex, col_name2, 0)
+    other_columns_list=[GetColumnByName(p, objIndex, col, 0) for col in args]
+    return col1, col2, other_columns_list
+end
+
+# delete old files and folders
+for item in ListDir(opcox_user + '/PKI/')
+    Remove(opcox_user + '/PKI/' + item)
+    end
+
+
+MakeDirs(opcox_user + '/PKI/')
+path_cb1 = GetCwd() + '/' + opcox_user + '/PKI/cfmcb.txt'
+path_cb2 = GetCwd() + '/' + opcox_user + '/PKI/actcb.txt'
+path_rmvCA = GetCwd() + '/' + opcox_user + '/PKI/rmvCA.txt'
+path_preconfig = GetCwd() + '/' + opcox_user + '/PKI/preconfig.txt'
+path_addiprt = GetCwd() + '/' + opcox_user + '/PKI/addiprt.txt'
+path_reqdevcert = GetCwd() + '/' + opcox_user + '/PKI/reqdevcert.txt'
+path_modikepeer = GetCwd() + '/' + opcox_user + '/PKI/modikepeer.txt'
+path_modappcert = GetCwd() + '/' + opcox_user + '/PKI/modappcert.txt'
+pathOaMIpv6 = GetCwd() + '/' + opcox_user + '/PKI/OaMIpv6.txt'
+WriteToAFile(pathOaMIpv6,'')
+pathOaMIpv4 = GetCwd() + '/' + opcox_user + '/PKI/OaMIpv4.txt'
+WriteToAFile(pathOaMIpv4,'')
+path_appcert_rrusw = GetCwd() + '/' + opcox_user + '/PKI/rruswitchoff.txt'
+path_casw = GetCwd() + '/' + opcox_user + '/PKI/caswitchoff.txt'
+path_modappcert_rollback_IKE = GetCwd() + '/' + opcox_user + '/PKI/modappcert_rollback_ike.txt'
+path_modappcert_rollback_SSL = GetCwd() + '/' + opcox_user + '/PKI/modappcert_rollback_ssl.txt'
+path_modikepeer_rollback = GetCwd() + '/' + opcox_user + '/PKI/modikepeer_rollback.txt'
+path_DSP_CERTMK = GetCwd() + '/' + opcox_user + '/PKI/provide esn.txt'
+
+def preconfig_pki(Enb_list)
+    OaM_ipv4_list = []
+    for it in Enb_list
+        if ConnectNE(it)
+            Dsp_certmk_list=com('DSP CERTMK:;',0,'Certificate File Name','Common Name')
+            for i in range(0, len(Dsp_certmk_list[0]))
+
+                if Dsp_certmk_list[0][i] =='appcert.pem'
+                    WriteToAFile(path_DSP_CERTMK,it+','+Dsp_certmk_list[1][i]+'\n')
+                    end
+            end
+            
+            
+        else
+            Print(it+' is disconnected.\n')
+        end
+    end
+    for it in Enb_list
+        OmIpv6_flag=False
+        if ConnectNE(it)
+            Omch =com('LST OMCH:;',0,'Bearer Type','User Label')
+            for i in range(0,len(Omch[0]))
+                if Omch[0][i] == 'IPV6'
+                    OmIpv6_flag=True
+                    WriteToAFile(pathOaMIpv6,it+'\n')
+                else 
+                    OaM_ipv4_list.append(it)
+                    OmIpv6_flag = False
+                    WriteToAFile(pathOaMIpv4,it+'\n')
+                    WriteToAFile(pathOaMIpv6,'')
+                end
+            end
+            WriteToAFile(path_cb1,'CFM CB:NAME="before_PKI",AUTORBKSW=DISABLE;"'+'{'+it+'}\n')
+            WriteToAFile(path_cb2,'ACT CB:NAME="before_PKI",AUTORBKSW=DISABLE;"'+'{'+it+'}\n')
+            WriteToAFile(path_appcert_rrusw,'MOD APPCERT:APPTYPE=SSL,APPCERT="OperPKIcert.pem",RRUCERTREQSW=OFF,FORCEEXECUTE=YES;'+'{'+it+'}\n')
+            WriteToAFile(path_casw,'MOD CERTMK:APPCERT="OperPKIcert.pem",CASW=OFF,FORCEEXECUTE=YES;'+'{'+it+'}\n')
+            Vlanmap_list = com('LST VLANMAP:;',0,'Next Hop IP','VLAN ID')
+            
+            WriteToAFile(path_rmvCA,'RMV CA:CANAME="CN=LTE Root CA 4096,O=Vodafone,C=DE";'+'{'+it+'}\n')
+            # WriteToAFile(path_preconfig,'//MOD CERTMK:APPCERT="OperPKIcert.pem",CASW=ON,CANAME="CN=LTE Root CA 4096,O=Vodafone,C=DE",FORCEEXECUTE=YES;'+'{'+str(it)+'}\n')
+            WriteToAFile(path_preconfig,'ADD CA:CANAME="CN=Vodafone ECDSA RAN CA,O=Vodafone,C=DE",IPVERSION=IPV4,URL="http://62.95.207.20:80/ejbca/publicweb/cmp/hua",SIGNALG=SHA384,MODE=DEFAULT_MODE,SLVURL="http://62.95.207.28:80/ejbca/publicweb/cmp/hua",CERTREQSW=DEFAULT,TLSSECCSSW=OFF;'+'{'+str(it)+'}\n')
+
+            if len(Vlanmap_list[0])==0
+                Iprt_list=[]
+                Iprt6_list=[]
+                Nh_Oam=''
+                Nh6_Oam=''
+                if OmIpv6_flag == False
+                    Iprt_list = com('LST IPROUTE4:;',0,'Route Index','Destination IP','Next Hop IP','User Label')
+                    for i in range(0,len(Iprt_list[1]))
+                        if (Iprt_list[1][i] =='10.0.0.0' or 'OM' in Iprt_list[2][1][i] or 'PKI' in Iprt_list[2][1][i])
+                            Nh_Oam=Iprt_list[2][0][i]
+                            break
+                        end
+                    end
+                
+                    if "62.95.207.20"  in Iprt_list[1] or "62.95.207.28"  in Iprt_list[1]
+                        if "62.95.207.20"  in Iprt_list[1] and "62.95.207.28"  in Iprt_list[1]
+                          WriteToAFile(path_addiprt, '// '+it+ ' BOTH routes are already added!\n') 
+                        else 
+                            WriteToAFile(path_addiprt, '// '+it+ ' check if BOTH routes are already added!\n')
+                        end
+                    
+                    elif '10' not in Iprt_list[0] and '11' not in Iprt_list[0] and Nh_Oam !=''
+                        WriteToAFile(path_addiprt,'ADD IPROUTE4:RTIDX=10,DSTIP="62.95.207.20",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+Nh_Oam+'",MTUSWITCH=OFF,USERLABEL="Primary CA IPv4 Subnet",FORCEEXECUTE=YES;'+'{'+str(it)+'}\n')
+                        WriteToAFile(path_addiprt,'ADD IPROUTE4:RTIDX=11,DSTIP="62.95.207.28",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+Nh_Oam+'",MTUSWITCH=OFF,USERLABEL="Secondary CA IPv4 Subnet",FORCEEXECUTE=YES;'+'{'+str(it)+'}\n')
+                    elif '30' not in Iprt_list[0] and '31' not in Iprt_list[0] and Nh_Oam !=''
+                        WriteToAFile(path_addiprt,'ADD IPROUTE4:RTIDX=30,DSTIP="62.95.207.20",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+Nh_Oam+'",MTUSWITCH=OFF,USERLABEL="Primary CA IPv4 Subnet",FORCEEXECUTE=YES;'+'{'+str(it)+'}\n')
+                        WriteToAFile(path_addiprt,'ADD IPROUTE4:RTIDX=31,DSTIP="62.95.207.28",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+Nh_Oam+'",MTUSWITCH=OFF,USERLABEL="Secondary CA IPv4 Subnet",FORCEEXECUTE=YES;'+'{'+str(it)+'}\n')
+
+                    else
+                        WriteToAFile(path_addiprt,'CHECK for Free Route ID\n')
+                        WriteToAFile(path_addiprt,'ADD IPROUTE4:RTIDX=10,DSTIP="62.95.207.20",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+Nh_Oam+'",MTUSWITCH=OFF,USERLABEL="Primary CA IPv4 Subnet",FORCEEXECUTE=YES;'+'{'+str(it)+'}\n')
+                        WriteToAFile(path_addiprt,'CHECK for Free Route ID\n')
+                        WriteToAFile(path_addiprt,'ADD IPROUTE4:RTIDX=11,DSTIP="62.95.207.28",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+Nh_Oam+'",MTUSWITCH=OFF,USERLABEL="Secondary CA IPv4 Subnet",FORCEEXECUTE=YES;'+'{'+str(it)+'}\n')
+                    end
+                elif OmIpv6_flag == True
+                    Iprt6_list = com('LST IPROUTE6:;',0,'Route Index','Destination IPv6 Address','Next-Hop IPv6 Address','User Label')
+                    #do stuff here
+                    for i in range(0,len(Iprt6_list[1]))
+                        if ( 'OM' in Iprt6_list[2][1][i])
+                            Nh6_Oam=Iprt6_list[2][0][i]
+                            break
+                        end
+                    end
+                    if '2A01:8F0:BB0:C08::4' in Iprt6_list[1] or '2A01:8F0:BB0:1001::4' in  Iprt6_list[1]
+                        if '2A01:8F0:BB0:C08::4' in Iprt6_list[1] and '2A01:8F0:BB0:1001::4' in  Iprt6_list[1]
+                            WriteToAFile(path_addiprt, '// '+it+ ' BOTH routes are already added!\n')
+                        else
+                            WriteToAFile(path_addiprt, '// '+it+ ' check if BOTH routes are already added!\n')
+                        end
+                    elif '10' not in Iprt6_list[0] and '11' not in Iprt6_list[0] and Nh6_Oam !=''
+                        WriteToAFile(path_addiprt,'ADD IPROUTE6:RTIDX=10,DSTIP="2A01:8F0:BB0:C08::4",PFXLEN=128,RTTYPE=NEXTHOP,NEXTHOP="'+Nh6_Oam+'",USERLABEL="PKI ipv6 primary",FORCEEXECUTE=YES;'+'{'+str(it)+'}\n')
+                        WriteToAFile(path_addiprt,'ADD IPROUTE6:RTIDX=11,DSTIP="2A01:8F0:BB0:1001::4",PFXLEN=128,RTTYPE=NEXTHOP,NEXTHOP="'+Nh6_Oam+'",USERLABEL="PKI ipv6 secondary,FORCEEXECUTE=YES";'+'{'+str(it)+'}\n')
+                    elif '30' not in Iprt_list[0] and '31' not in Iprt_list[0] and Nh6_Oam !=''
+                        WriteToAFile(path_addiprt,'ADD IPROUTE6:RTIDX=30,DSTIP="2A01:8F0:BB0:C08::4",PFXLEN=128,RTTYPE=NEXTHOP,NEXTHOP="'+Nh6_Oam+'",USERLABEL="PKI ipv6 primary,FORCEEXECUTE=YES";'+'{'+str(it)+'}\n')
+                        WriteToAFile(path_addiprt,'ADD IPROUTE6:RTIDX=31,DSTIP="2A01:8F0:BB0:1001::4",PFXLEN=128,RTTYPE=NEXTHOP,NEXTHOP="'+Nh6_Oam+'",USERLABEL="PKI ipv6 secondary,FORCEEXECUTE=YES";'+'{'+str(it)+'}\n')
+                    else
+                        WriteToAFile(path_addiprt,'CHECK for Free Route ID\n')
+                        WriteToAFile(path_addiprt,'ADD IPROUTE6:RTIDX=10,DSTIP="2A01:8F0:BB0:C08::4",PFXLEN=128,RTTYPE=NEXTHOP,NEXTHOP="'+Nh6_Oam+'",USERLABEL="PKI ipv6 primary,FORCEEXECUTE=YES";'+'{'+str(it)+'}\n')
+                        WriteToAFile(path_addiprt,'CHECK for Free Route ID\n')
+                        WriteToAFile(path_addiprt,'ADD IPROUTE6:RTIDX=11,DSTIP="2A01:8F0:BB0:1001::4",PFXLEN=128,RTTYPE=NEXTHOP,NEXTHOP="'+Nh6_Oam+'",USERLABEL="PKI ipv6 secondary,FORCEEXECUTE=YES";'+'{'+str(it)+'}\n')
+                    end
+
+                end
+                
+                
+            else
+                Iprt_list = com('LST IPRT:;',0,'Route Index','Destination IP','Next Hop IP','Description Info')
+                Vlanmap_list = com('LST VLANMAP:;',0,'Next Hop IP','VLAN ID')
+                Subrack_id = com('LST SUBRACK:;',0,'Subrack No.','Subrack Type')
+                Nh_Oam=''
+                if len(Vlanmap_list[0])>0
+                    for i in range(0, len(Vlanmap_list[0]))
+                        if '303' in Vlanmap_list[1] or '301' in Vlanmap_list[1]
+                            Nh_Oam=Vlanmap_list[0][i]
+                            break
+                        end
+                    end
+                end
+                if "62.95.207.20"  in Iprt_list[1] or "62.95.207.28"  in Iprt_list[1] 
+                    WriteToAFile(path_addiprt, '// '+it+ ' check if routes are already added!\n')
+                elif '10' not in Iprt_list[0] and '11' not in Iprt_list[0] and Nh_Oam !=''
+                    WriteToAFile(path_addiprt,'ADD IPRT:RTIDX=10,SRN='+Subrack_id[0][0]+',SN=7,SBT=BASE_BOARD,DSTIP="62.95.207.20",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+Nh_Oam+'",MTUSWITCH=OFF,DESCRI="Primary CA IPv4 Subnet",FORCEEXECUTE=YES;'+'{'+str(it)+'}\n')
+                    WriteToAFile(path_addiprt,'ADD IPRT:RTIDX=11,SRN='+Subrack_id[0][0]+',SN=7,SBT=BASE_BOARD,DSTIP="62.95.207.28",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+Nh_Oam+'",MTUSWITCH=OFF,DESCRI="Secondary CA IPv4 Subnet",FORCEEXECUTE=YES;'+'{'+str(it)+'}\n')
+                elif '30' not in Iprt_list[0] and '31' not in Iprt_list[0] and Nh_Oam !=''
+                    WriteToAFile(path_addiprt,'ADD IPRT:RTIDX=30,SRN='+Subrack_id[0][0]+',SN=7,SBT=BASE_BOARD,DSTIP="62.95.207.20",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+Nh_Oam+'",MTUSWITCH=OFF,DESCRI="Primary CA IPv4 Subnet",FORCEEXECUTE=YES;'+'{'+str(it)+'}\n')
+                    WriteToAFile(path_addiprt,'ADD IPRT:RTIDX=31,SRN='+Subrack_id[0][0]+',SN=7,SBT=BASE_BOARD,DSTIP="62.95.207.28",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+Nh_Oam+'",MTUSWITCH=OFF,DESCRI="Secondary CA IPv4 Subnet",FORCEEXECUTE=YES;'+'{'+str(it)+'}\n')
+                else
+                    WriteToAFile(path_addiprt,'CHECK for Free Route ID\n')
+                    WriteToAFile(path_addiprt,'ADD IPRT:RTIDX=10,SRN='+Subrack_id[0][0]+',SN=7,SBT=BASE_BOARD,DSTIP="62.95.207.20",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+Nh_Oam+'",MTUSWITCH=OFF,DESCRI="Primary CA IPv4 Subnet",FORCEEXECUTE=YES;'+'{'+str(it)+'}\n')
+                    WriteToAFile(path_addiprt,'CHECK for Free Route ID\n')
+                    WriteToAFile(path_addiprt,'ADD IPRT:RTIDX=11,SRN='+Subrack_id[0][0]+',SN=7,SBT=BASE_BOARD,DSTIP="62.95.207.28",DSTMASK="255.255.255.255",RTTYPE=NEXTHOP,NEXTHOP="'+Nh_Oam+'",MTUSWITCH=OFF,DESCRI="Secondary CA IPv4 Subnet",FORCEEXECUTE=YES;'+'{'+str(it)+'}\n')
+
+                end
+            end
+            
+            WriteToAFile(path_preconfig,'MOD CERTREQ:KEYUSAGE=DATA_ENCIPHERMENT-1&DIGITAL_SIGNATURE-1&KEY_AGREEMENT-1&KEY_ENCIPHERMENT-1,SIGNALG=SHA384,KEYTYPE=ECDSA,ECCCURVE=P384;'+'{'+it+'}\n')
+            # WriteToAFile(path,'MOD CERTMK:APPCERT="OperPKIcert.pem",CASW=OFF,CANAME="CN=LTE Root CA 4096,O=Vodafone,C=DE",FORCEEXECUTE=YES;'+'{'+it+'}\n')
+            WriteToAFile(path_reqdevcert,'REQ DEVCERT:CANAME="CN=Vodafone ECDSA RAN CA,O=Vodafone,C=DE",APPCERT="OperPKIcert_new.pem";'+'{'+it+'}\n')
+            # WriteToAFile(path,'\n')
+            WriteToAFile(path_modappcert,'MOD APPCERT: APPTYPE=IKE, APPCERT="OperPKIcert_new.pem";'+'{'+it+'}\n')
+            WriteToAFile(path_modappcert_rollback_IKE,'MOD APPCERT: APPTYPE=IKE, APPCERT="OperPKIcert.pem";'+'{'+it+'}\n')
+            WriteToAFile(path_modappcert_rollback_SSL,'MOD APPCERT: APPTYPE=SSL, APPCERT="OperPKIcert.pem";'+'{'+it+'}\n')
+            # WriteToAFile(path_modappcert,'MOD APPCERT: APPTYPE=SSL, APPCERT="OperPKIcert_new.pem";'+'{'+it+'}\n')
+            Ikepeer_list=com('LST IKEPEER:;',0,'IKE Peer Name','IP Version','Remote Name')
+            for i in range(0,len(Ikepeer_list[0]))
+                if 'SON' not in Ikepeer_list[0][i] and Ikepeer_list[1][i]=='IPv4' 
+                    WriteToAFile(path_modikepeer,'MOD IKEPEER: PEERNAME="'+Ikepeer_list[0][i]+'", IKEVERSION=IKE_V2, IPVERSION=IPV4, IDTYPE=FQDN,REMOTENAME=" ";'+'{'+it+'}\n')
+                    WriteToAFile(path_modikepeer_rollback,'MOD IKEPEER: PEERNAME="'+Ikepeer_list[0][i]+'", IKEVERSION=IKE_V2, IPVERSION=IPV4, IDTYPE=IPV4;'+'{'+it+'}\n')
+                elif 'SON' not in Ikepeer_list[0][i] and Ikepeer_list[1][i]=='IPv6'
+                    WriteToAFile(path_modikepeer,'MOD IKEPEER: PEERNAME="'+Ikepeer_list[0][i]+'", IKEVERSION=IKE_V2, IPVERSION=IPV6, IDTYPE=FQDN,REMOTENAME=" ";'+'{'+it+'}\n')
+                    WriteToAFile(path_modikepeer_rollback,'MOD IKEPEER: PEERNAME="'+Ikepeer_list[0][i]+'", IKEVERSION=IKE_V2, IPVERSION=IPV6, IDTYPE=IPV4;'+'{'+it+'}\n')
+
+                end
+            end
+        end
+    end
+end
+
+form1 = CreateForm('PKI CA preconfiguration ', ['Confirm', 'Cancel'])
+Enter(form1)
+
+Label(form1, 180, ' \nSelect NE list file:')
+aa = FileChooser(form1, 'txt')
+Enter(form1)
+Label(form1, 180, ' ')
+Enter(form1)
+
+userSelect = ShowForm(form1)
+
+
+if userSelect == 'Confirm'
+
+    f = Open(GetValue(aa))
+    lst0 = [item.strip() for item in f.readlines()]
+end
+if userSelect == "Cancel"
+    userSelect = ShowForm(form1)
+end
+preconfig_pki(lst0)
+
+def mailreport()
+    #MAIL
+    Time_fj=''
+    loginInfo=CreateLoginInfo('10.0.72.45') 
+    mailInfo1=CreateMailInfo() 
+    mailInfo1['TO_ADDR'] = [vdf_mail]
+    # mailInfo1['CC_ADDR'] = ('')
+    mailInfo1['FROM_ADDR'] = opcox_user + '@ossadm.vfd2.de' 
+    mailInfo1['MAIL_SUBJECT'] = 'PKI preconfig' 
+    MAIL_BODY=''
+
+
+    mailInfo1['MAIL_BODY'] = '\n\n'+MAIL_BODY
+    mailInfo1['MAIL_ATTACH'] = [pathOaMIpv6,pathOaMIpv4,path_cb1,path_cb2,path_rmvCA,path_preconfig,path_addiprt,\
+    path_reqdevcert,path_modikepeer,path_modappcert,path_appcert_rrusw,path_casw,path_modappcert_rollback_IKE,path_modappcert_rollback_SSL,path_modikepeer_rollback,path_DSP_CERTMK]
+    # mailInfo1['MAIL_ATTACH'] = [path_DSP_CERTMK]
+    result1=SendMail(mailInfo1)
+    Print('\n' + 'Mail sending: ')
+    Print(result1)
+    end
+
+mailreport()

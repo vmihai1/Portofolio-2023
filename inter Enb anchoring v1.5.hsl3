@@ -1,0 +1,1252 @@
+#useful:
+#https://5g-tools.com/5g-nr-gscn-calculator/
+
+####  user data  ####
+
+opcox_user = 'vmihai1'
+vdf_mail = 'valentin.mihai@vodafone.com'
+
+
+####  GUI  ####
+form1 = CreateForm('Inter ENB Anchoring', ['Confirm', 'Cancel'])
+flag_onlytdd=CheckBox(form1, 450, "only NR TDD\n")
+Enter(form1)
+
+
+choices_region = ['NORDOST','OST','NORD','SUED','NORDOST & NORD','NORDOST & OST','OST & SUED']  
+dict_choices_region = {'0':['NORDOST_HUAWEI_N'],'1':['OST_HUAWEI_N'],'2':['NORD_HUAWEI_N'],'3':['SUED_HUAWEI_N'],'4':['NORDOST_HUAWEI_N','NORD_HUAWEI_N'],'5':['NORDOST_HUAWEI_N','OST_HUAWEI_N'],'6':['OST_HUAWEI_N','SUED_HUAWEI_N']}
+caption = 'Select Huawei region'  
+hRadio1= RadioBoxGroup(form1, 250, choices_region, caption)
+Enter(form1)
+Enter(form1)
+Label(form1,200, "\nAnchor NE Name, Anchored NE Name:")
+hEditNE = Edit(form1, 200)
+Enter(form1)
+Label(form1, 200, ' Anchoring info file:')
+a1 = FileChooser(form1, 'csv')
+Enter(form1)
+Label(form1, 200, ' 5G_pool_DU.csv file:')
+a2 = FileChooser(form1, 'csv')
+Enter(form1)
+Label(form1, 200, ' 5G_pool_CU.csv file')
+a3 = FileChooser(form1, 'csv')
+userSelect = ShowForm(form1)
+
+Anchor_NE_name = GetValue(hEditNE).split(',')[0]
+NR_NE_name = GetValue(hEditNE).split(',')[1]
+
+#### FUNCTION DEFINITIONS ####
+
+def WriteToAFile(f, string) 
+    if (IsFile(f)==False)
+        fp1 = Open(f,'a+')
+        #Print(f + ' file has been created!')
+        fp1.close()
+    end  
+    fp = Open(f, "a+")
+    if GetValue(flag_onlytdd) == True 
+        if '156510' in string or '372750' in string or '1956' in string or '4659' in string or 'NRCELLID=220' in string \
+        or 'NRCELLID=221' in string or 'NRCELLID=222' in string or 'NRCELLID=210' in string or 'NRCELLID=211' in string or 'NRCELLID=212' in string \
+        or '4692' in string or '375390' in string
+
+            if 'NRCELLFREQRELATION' in string and 'N78' in string
+                string = ''+string
+            else    
+                string = '//'+string
+            end
+        end
+    end
+
+    fp.write(string + '\n')
+    fp.close()
+end   
+
+def WriteToAFile_(f, string) 
+    """file write with no condations, same as 
+        for other scripts
+    """
+    if (IsFile(f)==False)
+        fp1 = Open(f,'a+')
+        #Print(f + ' file has been created!')
+        fp1.close()
+    end  
+    fp = Open(f, "a+")
+    fp.write(string + '\n')
+    fp.close()
+end 
+def  com(comm,objIndex,col_name1,col_name2,*args)
+        SendMML(comm)
+        rpt=GetMMLReport(-1)
+        p=ParseMMLRpt(rpt)
+        col1=GetColumnByName(p, objIndex, col_name1, 0)
+        col2=GetColumnByName(p, objIndex, col_name2, 0)
+        other_columns_list=[GetColumnByName(p, objIndex, col, 0) for col in args]
+        return col1, col2, other_columns_list
+    end
+
+for item in ListDir(opcox_user + '/InterENBAnchoring/')
+    Remove(opcox_user + '/InterENBAnchoring/' + item)
+    end
+MakeDirs(opcox_user + '/InterENBAnchoring/')
+path1 = GetCwd() + '/' + opcox_user + '/InterENBAnchoring/'+NR_NE_name+'_NR_Anchored__ADD.txt'
+path2 = GetCwd() + '/' + opcox_user + '/InterENBAnchoring/'+NR_NE_name+'_Script_to_remove_reverse.txt'
+path3 = GetCwd() + '/' + opcox_user + '/InterENBAnchoring/'+NR_NE_name+'_Script_to_remove.txt'
+path4 = GetCwd() + '/' + opcox_user + '/InterENBAnchoring/'+NR_NE_name+'_NR_Anchored__MOD.txt'
+
+path11 = GetCwd() + '/' + opcox_user + '/InterENBAnchoring/'+Anchor_NE_name+'_LTE_Anchor__ADD.txt'
+path22 = GetCwd() + '/' + opcox_user + '/InterENBAnchoring/'+Anchor_NE_name+'_Script_to_remove_reverse.txt'
+path33 = GetCwd() + '/' + opcox_user + '/InterENBAnchoring/'+Anchor_NE_name+'_Script_to_remove.txt'
+path44 = GetCwd() + '/' + opcox_user + '/InterENBAnchoring/'+Anchor_NE_name+'_LTE_Anchor__MOD.txt'
+WriteToAFile(path1,'')
+WriteToAFile(path2,'')
+WriteToAFile(path3,'')
+WriteToAFile(path4,'')
+WriteToAFile(path11,'')
+WriteToAFile(path22,'')
+WriteToAFile(path33,'')
+WriteToAFile(path44,'')
+
+def mailreport()
+    #MAIL
+    Time_fj=''
+    loginInfo=CreateLoginInfo('10.0.72.45') 
+    mailInfo1=CreateMailInfo() 
+    mailInfo1['TO_ADDR'] = [vdf_mail]
+    # mailInfo1['CC_ADDR'] = ('')
+    mailInfo1['FROM_ADDR'] = opcox_user + '@ossadm.vfd2.de' 
+    mailInfo1['MAIL_SUBJECT'] = 'Inter Enb Anchoring'
+    MAIL_BODY=''
+    mailInfo1['MAIL_BODY'] = '\n\n'+MAIL_BODY
+    mailInfo1['MAIL_ATTACH'] = [path1,path11]
+    result1=SendMail(mailInfo1)
+    Print('\n' + 'Mail sending: ')
+    Print(result1)
+    end
+
+#must have content and rows_no already initialized
+def csv_parser(content,rows_no,value_list,region_list)
+    index_value_list=[]
+    for item in value_list
+        flag=0 
+        row=0
+        col=0
+        for i in range(0,len(content))
+            if content[i][1] in region_list
+                for j in range(0, len(content[i]))    
+                    if content[i][j]==item
+                        # Print(content[i][j])
+                        # Print(content[i])
+                        # Print(i)
+                        # Print(j) 
+                        row=i
+                        col=j
+                        flag=1
+                    end
+                end 
+            end
+        end
+        index_value_list.append((row,col,item))  
+    end
+        #Print((row,col)) 
+        
+    # if flag==1  
+    #     return (row,col)
+    # else 
+    #     return False
+    # end
+    return index_value_list
+end
+
+
+# not doing other local cell IDs except the most common ones, no second carrier??
+def ltecellname2localid(cell)
+    #cell='OPL123A'
+    localcellID =''
+    if cell[1]=='X' and cell[6]=='A'
+        localcellID='0'
+    elif cell[1]=='X' and cell[6]=='B'
+        localcellID='1'
+    elif cell[1]=='X' and cell[6]=='C'
+        localcellID='2'
+    elif cell[1]=='X' and cell[6]=='D'
+        localcellID='3'
+    elif cell[1]=='P' and cell[6]=='A'
+        localcellID='30'
+    elif cell[1]=='P' and cell[6]=='B'
+        localcellID='31'
+    elif cell[1]=='P' and cell[6]=='C'
+        localcellID='32'
+    elif cell[1]=='G' and cell[6]=='A'
+        localcellID='24'
+    elif cell[1]=='G' and cell[6]=='B'
+        localcellID='25'
+    elif cell[1]=='G' and cell[6]=='C'
+        localcellID='26'
+    elif cell[1]=='X' and cell[6]=='H'
+        localcellID='7'
+    elif cell[1]=='X' and cell[6]=='I'
+        localcellID='8'
+    elif cell[1]=='X' and cell[6]=='K'
+        localcellID='9'
+    elif cell[1]=='X' and cell[6]=='E'
+        localcellID='4'
+    elif cell[1]=='X' and cell[6]=='F'
+        localcellID='5'
+    elif cell[1]=='X' and cell[6]=='G'
+        localcellID='6'
+    elif cell[1]=='X' and cell[6]=='T'
+        localcellID='18'
+    elif cell[1]=='X' and cell[6]=='U'
+        localcellID='19'
+    elif cell[1]=='X' and cell[6]=='V'
+        localcellID='20'
+    end
+    return localcellID
+end
+
+def nrcellname2localid(cell)
+    #cell='OPL123A'
+    if cell[1]=='R' and cell[6]=='A'
+        localcellID_='200'
+    elif cell[1]=='R' and cell[6]=='B'
+        localcellID_='201'
+    elif cell[1]=='R' and cell[6]=='C'
+        localcellID_='202'
+    elif cell[1]=='R' and cell[6]=='D'
+        localcellID_='203'
+    elif cell[1]=='P' and cell[6]=='A'
+        localcellID_='210'
+    elif cell[1]=='P' and cell[6]=='B'
+        localcellID_='211'
+    elif cell[1]=='P' and cell[6]=='C'
+        localcellID_='212'
+    elif cell[1]=='P' and cell[6]=='D'
+        localcellID_='213'
+    elif cell[1]=='K' and cell[6]=='A'
+        localcellID_='220'
+    elif cell[1]=='K' and cell[6]=='B'
+        localcellID_='221'
+    elif cell[1]=='K' and cell[6]=='C'
+        localcellID_='222'
+    elif cell[1]=='K' and cell[6]=='D'
+        localcellID_='223'
+    end
+    return localcellID_
+end
+
+####  Frequency declaration  ####
+
+#NR_DL_SSB_ARFCN_700='156030' old NR700
+NR_DL_SSB_ARFCN_700='156510'
+NR_DL_SSB_ARFCN_1800='372750'
+NR_DL_SSB_ARFCN_1800_2nd='375390' # for 25Mega BW
+NR_DL_SSB_ARFCN_3500='631968'
+NR_DL_SSB_ARFCN_list=['156510','372750','631968']
+
+# NR_DL_SSB_GSCN_700='1950' old NR700
+NR_DL_SSB_GSCN_700='1956'
+NR_DL_SSB_GSCN_1800='4659'
+NR_DL_SSB_GSCN_1800_2nd = '4692'
+NR_DL_SSB_GSCN_3500='7832'
+NR_DL_SSB_GSCN_list=['1956','4659','7832']
+
+LTE_DL_ARFCN_list=['9460','6300','3600','1801','100','2850']
+NR_GSCN_ARFCN_dict = {"4659":"372750","4692":"375390"}
+
+
+####  Generate script  ####
+
+WriteToAFile(path1,'// Anchor site: '+Anchor_NE_name)
+WriteToAFile(path1,'// NR site: '+ NR_NE_name)
+WriteToAFile(path11,'// Anchor site: '+Anchor_NE_name)
+WriteToAFile(path11,'// NR site: '+ NR_NE_name)
+WriteToAFile(path1,'\n')
+WriteToAFile(path11,'\n')
+
+
+if ConnectNE(NR_NE_name)
+    A000= com('LST IPCLKLINK:;',0,'Profile Type','Domain','Client IPv4','Server IPv4')
+    #Print(A000)
+    if len(A000[0])>0
+        if A000[0][0]=='G.8275.2' and A000[1][0]=='44' and '100.127' in A000[2][1][0]
+            Print('Anchored '+NR_NE_name +' PTS configuration done')
+            WriteToAFile(path1,'// Anchored '+ NR_NE_name +' PTS configuration done')
+        else
+            Print('Anchored '+NR_NE_name +' PTS configuration  NOT done, please check!')
+            WriteToAFile(path1,'// Anchored '+ NR_NE_name +' PTS configuration  NOT done, please check!')
+        end
+    end
+    A001=com('LST USERPLANEHOST:;',0,'User Plane Host ID','IPSec Auto Configure Switch')
+    if 'Enable' in A001[1] # the check is not fully accurate, short term solution only
+        Print('Anchored '+NR_NE_name +' DirectX2 configuration done')
+        WriteToAFile(path1,'// Anchored '+ NR_NE_name +' DirectX2 configuration done')
+    else
+        Print('Anchored '+NR_NE_name +' DirectX2 configuration  NOT done, please check!')
+        WriteToAFile(path1,'// Anchored '+ NR_NE_name +' DirectX2 configuration  NOT done, please check!')
+    end
+end
+
+WriteToAFile(path1,'\n//Create Backup Config')
+WriteToAFile(path1,'CFM CB:NAME="interenbanch",AUTORBKSW=DISABLE;'+'{'+NR_NE_name+'}')
+WriteToAFile(path11,'\n//Create Backup Config')
+WriteToAFile(path11,'CFM CB:NAME="interenbanch",AUTORBKSW=DISABLE;'+'{'+Anchor_NE_name+'}')
+
+
+if ConnectNE(Anchor_NE_name)
+
+    A00= com('LST IPCLKLINK:;',0,'Profile Type','Domain','Client IPv4','Server IPv4')
+    #Print(A00)
+    if len(A00[0])>0
+        if A00[0][0]=='G.8275.2' and A00[1][0]=='44' and '100.70' in A00[2][0][0] and '100.127' in A00[2][1][0]
+            Print('Anchor '+Anchor_NE_name +' PTS configuration done')
+            WriteToAFile(path11,'// Anchor '+ Anchor_NE_name +' PTS configuration done')
+        else
+            Print('Anchor '+Anchor_NE_name +' PTS configuration  NOT done, please check!')
+            WriteToAFile(path11,'// Anchor '+ Anchor_NE_name +' PTS configuration  NOT done, please check!')
+        end
+    end
+    A01=com('LST USERPLANEHOST:;',0,'User Plane Host ID','IPSec Auto Configure Switch')
+    if 'Enable' in A01[1] # the check is not fully accurate, short term solution only
+        Print('Anchor '+Anchor_NE_name +' DirectX2 configuration done')
+        WriteToAFile(path11,'// Anchor '+ Anchor_NE_name +' DirectX2 configuration done')
+    else
+        Print('Anchor '+Anchor_NE_name +' DirectX2 configuration  NOT done, please check!')
+        WriteToAFile(path11,'// Anchor '+ Anchor_NE_name +' DirectX2 configuration  NOT done, please check!')
+    end
+    Print('\n')
+    WriteToAFile(path11,'\n')
+    WriteToAFile(path1,'\n')
+
+
+    A0=com('LST CELL:;',0,'Local Cell ID','Downlink EARFCN')
+    Anchor_local_cell_ID_list=[]
+    for item in A0[0] 
+        if item not in Anchor_local_cell_ID_list and item not in ['100','101','102','103']
+            Anchor_local_cell_ID_list.append(item)
+        end
+    end
+
+    WriteToAFile(path11,'// NSA enabling')
+    WriteToAFile(path11,'MOD ENODEBALGOEXTSWITCH:NSAPROTOCOLCOMPATSW=PCC_ANCHORING_HO_OPT_SW-1;'+'{'+Anchor_NE_name+'}')
+    for it in range(0,len(Anchor_local_cell_ID_list))
+        WriteToAFile(path11,'MOD NSADCMGMTCONFIG:LOCALCELLID='+Anchor_local_cell_ID_list[it]+',NSADCALGOSWITCH=NSA_DC_CAPABILITY_SWITCH-1&NSA_PCC_ANCHORING_SWITCH-1;'+'{'+Anchor_NE_name+'}')
+        end
+    A1=com('LST NCELLPLMNLIST:;',0,'Mobile Network Code','Rat Type')
+    if 'NR' not in A1[1]
+        WriteToAFile(path11,'ADD NCELLPLMNLIST:Mcc="262", Mnc="02",RatType=NR;'+'{'+Anchor_NE_name+'}')
+
+    else
+        WriteToAFile(path11,'// NCELLPLMNLIST for 262 02 NR already configured on anchor site  '+ Anchor_NE_name )
+    end
+    else
+        WriteToAFile(path11, '\n// '+Anchor_NE_name+ ' is disconnected or on another OSS server.\n')
+end
+
+#NRMFBIFREQ check if other NR bands are needed or always add just N78
+#NRMFBIFREQ check if the object needs to exists only on NR site or also on anchor
+if ConnectNE(NR_NE_name)
+    A2=com('LST NRMFBIFREQ:;',0,'Downlink ARFCN',' Frequency Band')
+    A2_0=com('LST NRDUCELL:;',0,'NR DU Cell ID','NR DU Cell Name','Physical Cell ID',)
+    A2_1=com('LST CELL:;',0,'Local Cell ID','Downlink EARFCN')
+    NR_nrlocalcellID_list_unique=A2_0[0]
+    Print('NR DU cell local cell ID list of anchored NR node ' +NR_NE_name)
+    Print(NR_nrlocalcellID_list_unique)
+    NR_localcellID_list_unique=[]
+    for ii in A2_1[0]
+        if ii not in NR_localcellID_list_unique and ii not in ['100','101','102','103','104']
+            NR_localcellID_list_unique.append(ii)
+        end
+    end
+    Print('Collocated LTE local cell ID list of anchored NR node '+NR_NE_name)
+    Print(NR_localcellID_list_unique)
+
+    if 'n78' not in A2[1] and NR_DL_SSB_ARFCN_3500 not in A2[0]
+        WriteToAFile(path1,'ADD NRMFBIFREQ: DlArfcn='+NR_DL_SSB_ARFCN_3500+', FrequencyBand=N78;'+'{'+NR_NE_name+'}')
+    else
+        WriteToAFile(path1,'// NRMFBIFREQ on N78 and ARFCN 631968 already configured on 5G site  '+ NR_NE_name )
+    end
+    # if NR_cell_name[1]=='P' and 'n28' not in A2[1] and NR_DL_SSB_ARFCN_700 not in A2[0]
+    #     WriteToAFile(path1,'ADD NRMFBIFREQ: DlArfcn='+NR_DL_SSB_ARFCN_700+', FrequencyBand=N28;'+'{'+NR_NE_name+'}')
+    # end
+    # if NR_cell_name[1]=='K' and 'n3' not in A2[1] and NR_DL_SSB_ARFCN_1800 not in A2[0]
+    #     WriteToAFile(path1,'ADD NRMFBIFREQ: DlArfcn='+NR_DL_SSB_ARFCN_1800+', FrequencyBand=N3;'+'{'+NR_NE_name+'}')
+    # end
+else
+    WriteToAFile(path1, '\n// '+NR_NE_name+ ' is disconnected or on another OSS server.\n')
+    NR_nrlocalcellID_list_unique=[]
+end
+
+
+WriteToAFile(path1,'\n')
+WriteToAFile(path11,'\n')
+WriteToAFile(path11,'// Anchor Frequency Relation')
+if ConnectNE(Anchor_NE_name)    
+    A3=com('LST NRSCGFREQCONFIG:;',0,'PCC DL EARFCN','SCG DL ARFCN')
+    A4=com('LST CELL:;',0,'Local Cell ID','Downlink EARFCN')
+    LTE_anchorsite_DL_ARFCN_list=A4[1]
+    LTE_anchorsite_DL_ARFCN_list_unique=[]
+    LTE_anchorsite_localcellID_list_unique=[]
+    for arfcn in LTE_anchorsite_DL_ARFCN_list
+        if arfcn not in LTE_anchorsite_DL_ARFCN_list_unique
+            LTE_anchorsite_DL_ARFCN_list_unique.append(arfcn)
+            end
+    end
+    Print('Anchoring LTE local cell DL ARFCN list '+Anchor_NE_name)
+    Print(LTE_anchorsite_DL_ARFCN_list_unique)
+    for localcell in A4[0]
+        if localcell not in LTE_anchorsite_localcellID_list_unique and localcell not in ['100','101','102','103']
+            LTE_anchorsite_localcellID_list_unique.append(localcell)
+            
+        end
+    end
+    Print('Anchoring LTE local cell ID list '+Anchor_NE_name)
+    Print(LTE_anchorsite_localcellID_list_unique)
+
+    for arfcn in LTE_anchorsite_DL_ARFCN_list_unique
+
+        if arfcn not in A3[0] and arfcn!='NULL'
+            WriteToAFile(path11,'ADD NRSCGFREQCONFIG:PccDlEarfcn='+arfcn+',ScgDlArfcn=156510,ScgDlArfcnPriority=2,NsaDcB1ThldRsrp=-115;'+'{'+Anchor_NE_name+'}')
+            WriteToAFile(path11,'ADD NRSCGFREQCONFIG:PccDlEarfcn='+arfcn+',ScgDlArfcn=372750,ScgDlArfcnPriority=5,NsaDcB1ThldRsrp=-115;'+'{'+Anchor_NE_name+'}')
+            WriteToAFile(path11,'ADD NRSCGFREQCONFIG:PccDlEarfcn='+arfcn+',ScgDlArfcn=375390,ScgDlArfcnPriority=5,NsaDcB1ThldRsrp=-115;'+'{'+Anchor_NE_name+'}')
+            WriteToAFile(path11,'ADD NRSCGFREQCONFIG:PccDlEarfcn='+arfcn+',ScgDlArfcn=631968,ScgDlArfcnPriority=8,NsaDcB1ThldRsrp=-115;'+'{'+Anchor_NE_name+'}')
+        end
+        if arfcn in A3[0] and arfcn!='NULL'
+            for i in range(0,len(A3[0]))
+                if A3[0][i]==arfcn and A3[1][i] in NR_DL_SSB_ARFCN_list
+                    WriteToAFile(path22,'RMV NRSCGFREQCONFIG:PCCDLEARFCN='+A3[0][i]+',SCGDLARFCN='+A3[1][i]+';'+'{'+Anchor_NE_name+'}') # not used
+                end
+            end
+            #WriteToAFile(path2,'\n')
+            WriteToAFile(path11,'ADD NRSCGFREQCONFIG:PccDlEarfcn='+arfcn+',ScgDlArfcn=156510,ScgDlArfcnPriority=2,NsaDcB1ThldRsrp=-115;'+'{'+Anchor_NE_name+'}')
+            WriteToAFile(path11,'ADD NRSCGFREQCONFIG:PccDlEarfcn='+arfcn+',ScgDlArfcn=372750,ScgDlArfcnPriority=5,NsaDcB1ThldRsrp=-115;'+'{'+Anchor_NE_name+'}')
+            WriteToAFile(path11,'ADD NRSCGFREQCONFIG:PccDlEarfcn='+arfcn+',ScgDlArfcn=375390,ScgDlArfcnPriority=5,NsaDcB1ThldRsrp=-115;'+'{'+Anchor_NE_name+'}')
+            WriteToAFile(path11,'ADD NRSCGFREQCONFIG:PccDlEarfcn='+arfcn+',ScgDlArfcn=631968,ScgDlArfcnPriority=8,NsaDcB1ThldRsrp=-115;'+'{'+Anchor_NE_name+'}')
+
+            #copied later in path11
+            WriteToAFile(path44,'MOD NRSCGFREQCONFIG:PccDlEarfcn='+arfcn+',ScgDlArfcn=156510,ScgDlArfcnPriority=2,NsaDcB1ThldRsrp=-115;'+'{'+Anchor_NE_name+'}')
+            WriteToAFile(path44,'MOD NRSCGFREQCONFIG:PccDlEarfcn='+arfcn+',ScgDlArfcn=372750,ScgDlArfcnPriority=5,NsaDcB1ThldRsrp=-115;'+'{'+Anchor_NE_name+'}')
+            WriteToAFile(path44,'MOD NRSCGFREQCONFIG:PccDlEarfcn='+arfcn+',ScgDlArfcn=375390,ScgDlArfcnPriority=5,NsaDcB1ThldRsrp=-115;'+'{'+Anchor_NE_name+'}')
+            WriteToAFile(path44,'MOD NRSCGFREQCONFIG:PccDlEarfcn='+arfcn+',ScgDlArfcn=631968,ScgDlArfcnPriority=8,NsaDcB1ThldRsrp=-115;'+'{'+Anchor_NE_name+'}')
+
+        end
+    end
+    WriteToAFile(path22,'\n')
+
+    WriteToAFile(path11,'\n')
+    WriteToAFile(path11,'// On anchoring LTE node add for all LTE cells NR frequencies that could be measured and SCS -- 4G5G Cell2Freq relations on LTE node '+Anchor_NE_name)
+    A5=com('LST NRNFREQ:;',0,'Local cell ID','Downlink ARFCN')
+    for localcell in LTE_anchorsite_localcellID_list_unique
+
+        if localcell not in A5[0] and localcell!='NULL'
+            WriteToAFile(path11,'ADD NRNFREQ:LOCALCELLID='+localcell+',DLARFCN=156510,ULARFCNCONFIGIND=NOT_CFG,NRFREQRESELPRIORITY=7,SUBCARRIERSPACING=15KHZ,AGGREGATIONATTRIBUTE=ANR_INDICATION-0&SSB_INDEX_FROM_CELL_INDICATION-1&FIRST_PLMN_RESERVED_INDICATION-0&FREQ_MEAS_FLAG-1&PLMN_RR_INDICATION-0&VG_MODEL_FORBID_BUILD_FLAG-0&DSS_FREQ_INDICATION-0&NR_B1_B2_PLUS_RSRQ_INDICATION-0&SIB24_EXCLUDE_FREQ_INDICATION-0&NR_DL_SCC_FREQ_ONLY_IND-0;'+'{'+Anchor_NE_name+'}')
+            WriteToAFile(path11,'ADD NRNFREQ:LOCALCELLID='+localcell+',DLARFCN=372750,ULARFCNCONFIGIND=NOT_CFG,NRFREQRESELPRIORITY=7,SUBCARRIERSPACING=15KHZ,AGGREGATIONATTRIBUTE=ANR_INDICATION-0&SSB_INDEX_FROM_CELL_INDICATION-1&FIRST_PLMN_RESERVED_INDICATION-0&FREQ_MEAS_FLAG-1&PLMN_RR_INDICATION-0&VG_MODEL_FORBID_BUILD_FLAG-0&DSS_FREQ_INDICATION-0&NR_B1_B2_PLUS_RSRQ_INDICATION-0&SIB24_EXCLUDE_FREQ_INDICATION-0&NR_DL_SCC_FREQ_ONLY_IND-0;'+'{'+Anchor_NE_name+'}')
+            #adding also for the 375390 for NR1800 (SA ready HDSS 20/25MHz)
+            WriteToAFile(path11,'ADD NRNFREQ:LOCALCELLID='+localcell+',DLARFCN=375390,ULARFCNCONFIGIND=NOT_CFG,NRFREQRESELPRIORITY=7,SUBCARRIERSPACING=15KHZ,AGGREGATIONATTRIBUTE=ANR_INDICATION-0&SSB_INDEX_FROM_CELL_INDICATION-1&FIRST_PLMN_RESERVED_INDICATION-0&FREQ_MEAS_FLAG-1&PLMN_RR_INDICATION-0&VG_MODEL_FORBID_BUILD_FLAG-0&DSS_FREQ_INDICATION-0&NR_B1_B2_PLUS_RSRQ_INDICATION-0&SIB24_EXCLUDE_FREQ_INDICATION-0&NR_DL_SCC_FREQ_ONLY_IND-0;'+'{'+Anchor_NE_name+'}')
+            WriteToAFile(path11,'ADD NRNFREQ:LOCALCELLID='+localcell+',DLARFCN=631968,ULARFCNCONFIGIND=NOT_CFG,NRFREQRESELPRIORITY=7,SUBCARRIERSPACING=30KHZ,AGGREGATIONATTRIBUTE=ANR_INDICATION-1&SSB_INDEX_FROM_CELL_INDICATION-1&FIRST_PLMN_RESERVED_INDICATION-0&FREQ_MEAS_FLAG-1&PLMN_RR_INDICATION-0&VG_MODEL_FORBID_BUILD_FLAG-0&DSS_FREQ_INDICATION-0&NR_B1_B2_PLUS_RSRQ_INDICATION-0&SIB24_EXCLUDE_FREQ_INDICATION-0&NR_DL_SCC_FREQ_ONLY_IND-0;'+'{'+Anchor_NE_name+'}')
+        end
+        if localcell  in A5[0] and localcell!='NULL'
+            for i in range(0,len(A5[0]))
+                if A5[0][i]==localcell and A5[1][i] in NR_DL_SSB_ARFCN_list
+                    WriteToAFile(path22,'RMV NRNFREQ:LOCALCELLID='+A5[0][i]+',DLARFCN='+A5[1][i]+';'+'{'+Anchor_NE_name+'}')
+                end
+            end   
+            #WriteToAFile(path2,'\n')
+            WriteToAFile(path11,'ADD NRNFREQ:LOCALCELLID='+localcell+',DLARFCN=156510,ULARFCNCONFIGIND=NOT_CFG,NRFREQRESELPRIORITY=7,SUBCARRIERSPACING=15KHZ,AGGREGATIONATTRIBUTE=ANR_INDICATION-0&SSB_INDEX_FROM_CELL_INDICATION-1&FIRST_PLMN_RESERVED_INDICATION-0&FREQ_MEAS_FLAG-1&PLMN_RR_INDICATION-0&VG_MODEL_FORBID_BUILD_FLAG-0&DSS_FREQ_INDICATION-0&NR_B1_B2_PLUS_RSRQ_INDICATION-0&SIB24_EXCLUDE_FREQ_INDICATION-0&NR_DL_SCC_FREQ_ONLY_IND-0;'+'{'+Anchor_NE_name+'}')
+            WriteToAFile(path11,'ADD NRNFREQ:LOCALCELLID='+localcell+',DLARFCN=372750,ULARFCNCONFIGIND=NOT_CFG,NRFREQRESELPRIORITY=7,SUBCARRIERSPACING=15KHZ,AGGREGATIONATTRIBUTE=ANR_INDICATION-0&SSB_INDEX_FROM_CELL_INDICATION-1&FIRST_PLMN_RESERVED_INDICATION-0&FREQ_MEAS_FLAG-1&PLMN_RR_INDICATION-0&VG_MODEL_FORBID_BUILD_FLAG-0&DSS_FREQ_INDICATION-0&NR_B1_B2_PLUS_RSRQ_INDICATION-0&SIB24_EXCLUDE_FREQ_INDICATION-0&NR_DL_SCC_FREQ_ONLY_IND-0;'+'{'+Anchor_NE_name+'}')
+            #adding also for the 375390 for NR1800 (SA ready HDSS 20/25MHz)
+            WriteToAFile(path11,'ADD NRNFREQ:LOCALCELLID='+localcell+',DLARFCN=375390,ULARFCNCONFIGIND=NOT_CFG,NRFREQRESELPRIORITY=7,SUBCARRIERSPACING=15KHZ,AGGREGATIONATTRIBUTE=ANR_INDICATION-0&SSB_INDEX_FROM_CELL_INDICATION-1&FIRST_PLMN_RESERVED_INDICATION-0&FREQ_MEAS_FLAG-1&PLMN_RR_INDICATION-0&VG_MODEL_FORBID_BUILD_FLAG-0&DSS_FREQ_INDICATION-0&NR_B1_B2_PLUS_RSRQ_INDICATION-0&SIB24_EXCLUDE_FREQ_INDICATION-0&NR_DL_SCC_FREQ_ONLY_IND-0;'+'{'+Anchor_NE_name+'}')
+            WriteToAFile(path11,'ADD NRNFREQ:LOCALCELLID='+localcell+',DLARFCN=631968,ULARFCNCONFIGIND=NOT_CFG,NRFREQRESELPRIORITY=7,SUBCARRIERSPACING=30KHZ,AGGREGATIONATTRIBUTE=ANR_INDICATION-1&SSB_INDEX_FROM_CELL_INDICATION-1&FIRST_PLMN_RESERVED_INDICATION-0&FREQ_MEAS_FLAG-1&PLMN_RR_INDICATION-0&VG_MODEL_FORBID_BUILD_FLAG-0&DSS_FREQ_INDICATION-0&NR_B1_B2_PLUS_RSRQ_INDICATION-0&SIB24_EXCLUDE_FREQ_INDICATION-0&NR_DL_SCC_FREQ_ONLY_IND-0;'+'{'+Anchor_NE_name+'}')
+
+            WriteToAFile(path44,'MOD NRNFREQ:LOCALCELLID='+localcell+',DLARFCN=156510,ULARFCNCONFIGIND=NOT_CFG,NRFREQRESELPRIORITY=7,SUBCARRIERSPACING=15KHZ,AGGREGATIONATTRIBUTE=ANR_INDICATION-0&SSB_INDEX_FROM_CELL_INDICATION-1&FIRST_PLMN_RESERVED_INDICATION-0&FREQ_MEAS_FLAG-1&PLMN_RR_INDICATION-0&VG_MODEL_FORBID_BUILD_FLAG-0&DSS_FREQ_INDICATION-0&NR_B1_B2_PLUS_RSRQ_INDICATION-0&SIB24_EXCLUDE_FREQ_INDICATION-0&NR_DL_SCC_FREQ_ONLY_IND-0;'+'{'+Anchor_NE_name+'}')
+            WriteToAFile(path44,'MOD NRNFREQ:LOCALCELLID='+localcell+',DLARFCN=372750,ULARFCNCONFIGIND=NOT_CFG,NRFREQRESELPRIORITY=7,SUBCARRIERSPACING=15KHZ,AGGREGATIONATTRIBUTE=ANR_INDICATION-0&SSB_INDEX_FROM_CELL_INDICATION-1&FIRST_PLMN_RESERVED_INDICATION-0&FREQ_MEAS_FLAG-1&PLMN_RR_INDICATION-0&VG_MODEL_FORBID_BUILD_FLAG-0&DSS_FREQ_INDICATION-0&NR_B1_B2_PLUS_RSRQ_INDICATION-0&SIB24_EXCLUDE_FREQ_INDICATION-0&NR_DL_SCC_FREQ_ONLY_IND-0;'+'{'+Anchor_NE_name+'}')
+            #adding also for the 375390 for NR1800 (SA ready HDSS 20/25MHz)
+            WriteToAFile(path44,'MOD NRNFREQ:LOCALCELLID='+localcell+',DLARFCN=375390,ULARFCNCONFIGIND=NOT_CFG,NRFREQRESELPRIORITY=7,SUBCARRIERSPACING=15KHZ,AGGREGATIONATTRIBUTE=ANR_INDICATION-0&SSB_INDEX_FROM_CELL_INDICATION-1&FIRST_PLMN_RESERVED_INDICATION-0&FREQ_MEAS_FLAG-1&PLMN_RR_INDICATION-0&VG_MODEL_FORBID_BUILD_FLAG-0&DSS_FREQ_INDICATION-0&NR_B1_B2_PLUS_RSRQ_INDICATION-0&SIB24_EXCLUDE_FREQ_INDICATION-0&NR_DL_SCC_FREQ_ONLY_IND-0;'+'{'+Anchor_NE_name+'}')
+            WriteToAFile(path44,'MOD NRNFREQ:LOCALCELLID='+localcell+',DLARFCN=631968,ULARFCNCONFIGIND=NOT_CFG,NRFREQRESELPRIORITY=7,SUBCARRIERSPACING=30KHZ,AGGREGATIONATTRIBUTE=ANR_INDICATION-1&SSB_INDEX_FROM_CELL_INDICATION-1&FIRST_PLMN_RESERVED_INDICATION-0&FREQ_MEAS_FLAG-1&PLMN_RR_INDICATION-0&VG_MODEL_FORBID_BUILD_FLAG-0&DSS_FREQ_INDICATION-0&NR_B1_B2_PLUS_RSRQ_INDICATION-0&SIB24_EXCLUDE_FREQ_INDICATION-0&NR_DL_SCC_FREQ_ONLY_IND-0;'+'{'+Anchor_NE_name+'}')
+
+            
+        end
+    end
+    WriteToAFile(path22,'\n')
+
+    WriteToAFile(path11,'\n')
+    WriteToAFile(path44,'\n')
+    WriteToAFile(path11,'// NSA parametrization')
+    for localcell in LTE_anchorsite_localcellID_list_unique
+        WriteToAFile(path11,'MOD CELLMLBUESEL:LOCALCELLID='+localcell+',NSADCUESELECTIONSTRATEGY=LTE_UE_PREFERRED;'+'{'+Anchor_NE_name+'}')
+        end
+    for localcell in LTE_anchorsite_localcellID_list_unique
+        WriteToAFile(path11,'MOD CELLUEMEASCONTROLCFG:LOCALCELLID='+localcell+',MEASOPTALGOSWITCH=NSA_SA_MEAS_OBJ_PREEMPTION_SW-1;'+'{'+Anchor_NE_name+'}')
+        end
+
+    WriteToAFile(path11,'MOD ENODEBALGOEXTSWITCH:NSADCALGOSWITCH=EUTRA_PDCP_CONFIG_OPT_SW-1&LTE_HO_NO_NRT_FORBID_SCG_SW-1,NSAPROTOCOLCOMPATSW=X2_HO_COMPATIBILITY_SW-1&SMTC_CONFIG_SW-1&PCC_ANCHORING_HO_OPT_SW-1,NRSCGINACTIVITYRELSTRATEGY=REL_UPON_LTE_INACTVTY_TMR_EXPN;'+'{'+Anchor_NE_name+'}')
+    WriteToAFile(path11,'MOD GLOBALPROCSWITCH:PEERREQBASEDX2DELSWITCH=ON,PROTOCOLSUPPORTSWITCH=MaxReportRsIndexSwitch-1,X2SONDELETESWITCH=BASED_ON_X2USAGE_WITH_NEGO-1&BASED_ON_X2USAGE_WITHOUT_NEGO-1&BASED_ON_SPEC_DYNAMIC_SHARING-1,X2SONDELETEHOINNUMTHD=10,X2SONDELETEHOOUTNUMTHD=10,INTERFACESETUPPOLICYSW=LTE_NR_X2_SON_SETUP_SW-1&X2_SON_SETUP_NO_NR_NRT_SW-0;'+'{'+Anchor_NE_name+'}')
+    WriteToAFile(path11,'MOD NSADCALGOPARAM:NSADCALGOSWITCH=GAP_OFS_ASSIGNMENT_OPT_SW-1;'+'{'+Anchor_NE_name+'}')
+
+    for localcell in LTE_anchorsite_localcellID_list_unique
+        WriteToAFile(path11,'MOD NSADCMGMTCONFIG:LOCALCELLID='+localcell+',NSADCALGOSWITCH=NSA_DC_CAPABILITY_SWITCH-1&NSA_PCC_ANCHORING_SWITCH-1&NSA_DC_COV_HO_ENH_SW-1,SCGADDITIONBUFFERLENTHLD=1,NRDATAVOLUMERPTCFG=300,UPPERLAYERINDICATIONSWITCH=ON,NSADCLTESCELLACTBFRDELTHLD=6,NSADCLTESCELLACTBFRLENTHLD=10,ULQUALITYTHLDFORSCGRELEASE=0,VOLTEPLRTHLDFORSCGRELEASE=3,NSADCUEPREUSERCNTTHLD=100,NSADCPCCANCHORA1RSRPTHLD=255,NSADCLTESCELLMEASDURATION=10,NSADCALGOEXTSWITCH=SCG_ADD_PCC_ANCHOR_VOL_OPT_SW-1&VOLUME_BASED_PCC_ANCHORING_SW-1;'+'{'+Anchor_NE_name+'}')
+        end
+
+    # CHECK WITH TABLE , question for only anchor cells / all cells ??
+    WriteToAFile(path11,'\n')
+    WriteToAFile(path11,'// LTE ANR enabling')
+    for localcell in LTE_anchorsite_localcellID_list_unique
+        WriteToAFile(path11,'MOD CELLALGOSWITCH:LOCALCELLID='+localcell+',ANRFUNCTIONSWITCH=INTRA_RAT_ANR_SW-1&INTER_RAT_ANR_SW-1&NR_EVENT_ANR_SW-1;'+'{'+Anchor_NE_name+'}')
+        end
+    WriteToAFile(path11,'MOD ENODEBALGOSWITCH:ANRSWITCH=NRNETWORKINGOPTIONUPTSWITCH-1;'+'{'+Anchor_NE_name+'}')
+
+    WriteToAFile(path1,'\n')
+    WriteToAFile(path1,'// NR ANR enabling')
+    for nrlocalcell in NR_nrlocalcellID_list_unique
+        if nrlocalcell in ['200','201','202','203','204','205']
+            WriteToAFile(path1,'MOD NRCELLALGOSWITCH:NRCELLID='+nrlocalcell+',ANRSWITCH=NR_NR_ANR_SW-1&NR_EUTRAN_ANR_SW-1&NR_NR_ANR_DEL_SW-0&NR_EUTRAN_ANR_DEL_SW-0&NR_NR_ANR_AUTO_NO_HO_SW-0&NR_EUTRAN_ANR_AUTO_NO_HO_SW-0&PCI_COLLISION_DETECT_SW-1&PCI_CONFUSION_DETECT_SW-1&NR_NR_ANR_OVER_DIST_DETECT_SW-1&NR_NR_FAST_ANR_SW-0&NR_EUTRAN_FAST_ANR_SW-0&AUTO_NR_FREQ_RELATION_SW-0&AUTO_EUTRAN_FREQ_RELATION_SW-0&EUTRAN_PCI_CONFUSION_DETECT_SW-0;'+'{'+NR_NE_name+'}')
+        elif nrlocalcell not in ['200','201','202','203','204','205']
+            WriteToAFile(path1,'MOD NRCELLALGOSWITCH:NRCELLID='+nrlocalcell+',ANRSWITCH=NR_NR_ANR_SW-0&NR_EUTRAN_ANR_SW-1&NR_NR_ANR_DEL_SW-0&NR_EUTRAN_ANR_DEL_SW-0&NR_NR_ANR_AUTO_NO_HO_SW-0&NR_EUTRAN_ANR_AUTO_NO_HO_SW-0&PCI_COLLISION_DETECT_SW-1&PCI_CONFUSION_DETECT_SW-1&NR_NR_ANR_OVER_DIST_DETECT_SW-1&NR_NR_FAST_ANR_SW-0&NR_EUTRAN_FAST_ANR_SW-0&AUTO_NR_FREQ_RELATION_SW-0&AUTO_EUTRAN_FREQ_RELATION_SW-0&EUTRAN_PCI_CONFUSION_DETECT_SW-0;'+'{'+NR_NE_name+'}')
+
+        end
+    end
+else
+    WriteToAFile(path11, '\n// '+Anchor_NE_name+ ' is disconnected or on another OSS server.\n')
+end 
+
+
+WriteToAFile(path1,'\n')
+WriteToAFile(path1,'// On anchored NR node add for all co-located LTE cells NR frequencies that could be measured and SCS -- 4G5G Cell2Freq relations on NR Node '+NR_NE_name)
+if ConnectNE(NR_NE_name)    
+    A6=com('LST NRNFREQ:;',0,'Local cell ID','Downlink ARFCN')
+    for localcell in NR_localcellID_list_unique
+        if localcell not in A6[0] and localcell!='NULL'
+            WriteToAFile(path1,'ADD NRNFREQ:LOCALCELLID='+localcell+',DLARFCN=156510,ULARFCNCONFIGIND=NOT_CFG,NRFREQRESELPRIORITY=7,SUBCARRIERSPACING=15KHZ,AGGREGATIONATTRIBUTE=ANR_INDICATION-0&SSB_INDEX_FROM_CELL_INDICATION-1&FIRST_PLMN_RESERVED_INDICATION-0&FREQ_MEAS_FLAG-1&PLMN_RR_INDICATION-0&VG_MODEL_FORBID_BUILD_FLAG-0&DSS_FREQ_INDICATION-0&NR_B1_B2_PLUS_RSRQ_INDICATION-0&SIB24_EXCLUDE_FREQ_INDICATION-0&NR_DL_SCC_FREQ_ONLY_IND-0;'+'{'+NR_NE_name+'}')
+            WriteToAFile(path1,'ADD NRNFREQ:LOCALCELLID='+localcell+',DLARFCN=372750,ULARFCNCONFIGIND=NOT_CFG,NRFREQRESELPRIORITY=7,SUBCARRIERSPACING=15KHZ,AGGREGATIONATTRIBUTE=ANR_INDICATION-0&SSB_INDEX_FROM_CELL_INDICATION-1&FIRST_PLMN_RESERVED_INDICATION-0&FREQ_MEAS_FLAG-1&PLMN_RR_INDICATION-0&VG_MODEL_FORBID_BUILD_FLAG-0&DSS_FREQ_INDICATION-0&NR_B1_B2_PLUS_RSRQ_INDICATION-0&SIB24_EXCLUDE_FREQ_INDICATION-0&NR_DL_SCC_FREQ_ONLY_IND-0;'+'{'+NR_NE_name+'}')
+            #adding also for the 375390 for NR1800 (SA ready HDSS 20/25MHz)
+            WriteToAFile(path1,'ADD NRNFREQ:LOCALCELLID='+localcell+',DLARFCN=375390,ULARFCNCONFIGIND=NOT_CFG,NRFREQRESELPRIORITY=7,SUBCARRIERSPACING=15KHZ,AGGREGATIONATTRIBUTE=ANR_INDICATION-0&SSB_INDEX_FROM_CELL_INDICATION-1&FIRST_PLMN_RESERVED_INDICATION-0&FREQ_MEAS_FLAG-1&PLMN_RR_INDICATION-0&VG_MODEL_FORBID_BUILD_FLAG-0&DSS_FREQ_INDICATION-0&NR_B1_B2_PLUS_RSRQ_INDICATION-0&SIB24_EXCLUDE_FREQ_INDICATION-0&NR_DL_SCC_FREQ_ONLY_IND-0;'+'{'+NR_NE_name+'}')
+            WriteToAFile(path1,'ADD NRNFREQ:LOCALCELLID='+localcell+',DLARFCN=631968,ULARFCNCONFIGIND=NOT_CFG,NRFREQRESELPRIORITY=7,SUBCARRIERSPACING=30KHZ,AGGREGATIONATTRIBUTE=ANR_INDICATION-1&SSB_INDEX_FROM_CELL_INDICATION-1&FIRST_PLMN_RESERVED_INDICATION-0&FREQ_MEAS_FLAG-1&PLMN_RR_INDICATION-0&VG_MODEL_FORBID_BUILD_FLAG-0&DSS_FREQ_INDICATION-0&NR_B1_B2_PLUS_RSRQ_INDICATION-0&SIB24_EXCLUDE_FREQ_INDICATION-0&NR_DL_SCC_FREQ_ONLY_IND-0;'+'{'+NR_NE_name+'}')
+        end
+        if localcell in A6[0] and localcell!='NULL'
+            for i in range(0,len(A6[0]))
+                if A6[0][i]==localcell and A6[1][i] in NR_DL_SSB_ARFCN_list
+                    WriteToAFile(path2,'RMV NRNFREQ:LOCALCELLID='+A6[0][i]+',DLARFCN='+A6[1][i]+';'+'{'+NR_NE_name+'}')
+                    end
+            end
+            #WriteToAFile(path2,'\n')
+            WriteToAFile(path1,'ADD NRNFREQ:LOCALCELLID='+localcell+',DLARFCN=156510,ULARFCNCONFIGIND=NOT_CFG,NRFREQRESELPRIORITY=7,SUBCARRIERSPACING=15KHZ,AGGREGATIONATTRIBUTE=ANR_INDICATION-0&SSB_INDEX_FROM_CELL_INDICATION-1&FIRST_PLMN_RESERVED_INDICATION-0&FREQ_MEAS_FLAG-1&PLMN_RR_INDICATION-0&VG_MODEL_FORBID_BUILD_FLAG-0&DSS_FREQ_INDICATION-0&NR_B1_B2_PLUS_RSRQ_INDICATION-0&SIB24_EXCLUDE_FREQ_INDICATION-0&NR_DL_SCC_FREQ_ONLY_IND-0;'+'{'+NR_NE_name+'}')
+            WriteToAFile(path1,'ADD NRNFREQ:LOCALCELLID='+localcell+',DLARFCN=372750,ULARFCNCONFIGIND=NOT_CFG,NRFREQRESELPRIORITY=7,SUBCARRIERSPACING=15KHZ,AGGREGATIONATTRIBUTE=ANR_INDICATION-0&SSB_INDEX_FROM_CELL_INDICATION-1&FIRST_PLMN_RESERVED_INDICATION-0&FREQ_MEAS_FLAG-1&PLMN_RR_INDICATION-0&VG_MODEL_FORBID_BUILD_FLAG-0&DSS_FREQ_INDICATION-0&NR_B1_B2_PLUS_RSRQ_INDICATION-0&SIB24_EXCLUDE_FREQ_INDICATION-0&NR_DL_SCC_FREQ_ONLY_IND-0;'+'{'+NR_NE_name+'}')
+            #adding also for the 375390 for NR1800 (SA ready HDSS 20/25MHz)
+            WriteToAFile(path1,'ADD NRNFREQ:LOCALCELLID='+localcell+',DLARFCN=375390,ULARFCNCONFIGIND=NOT_CFG,NRFREQRESELPRIORITY=7,SUBCARRIERSPACING=15KHZ,AGGREGATIONATTRIBUTE=ANR_INDICATION-0&SSB_INDEX_FROM_CELL_INDICATION-1&FIRST_PLMN_RESERVED_INDICATION-0&FREQ_MEAS_FLAG-1&PLMN_RR_INDICATION-0&VG_MODEL_FORBID_BUILD_FLAG-0&DSS_FREQ_INDICATION-0&NR_B1_B2_PLUS_RSRQ_INDICATION-0&SIB24_EXCLUDE_FREQ_INDICATION-0&NR_DL_SCC_FREQ_ONLY_IND-0;'+'{'+NR_NE_name+'}')
+            WriteToAFile(path1,'ADD NRNFREQ:LOCALCELLID='+localcell+',DLARFCN=631968,ULARFCNCONFIGIND=NOT_CFG,NRFREQRESELPRIORITY=7,SUBCARRIERSPACING=30KHZ,AGGREGATIONATTRIBUTE=ANR_INDICATION-1&SSB_INDEX_FROM_CELL_INDICATION-1&FIRST_PLMN_RESERVED_INDICATION-0&FREQ_MEAS_FLAG-1&PLMN_RR_INDICATION-0&VG_MODEL_FORBID_BUILD_FLAG-0&DSS_FREQ_INDICATION-0&NR_B1_B2_PLUS_RSRQ_INDICATION-0&SIB24_EXCLUDE_FREQ_INDICATION-0&NR_DL_SCC_FREQ_ONLY_IND-0;'+'{'+NR_NE_name+'}')
+        
+            WriteToAFile(path4,'MOD NRNFREQ:LOCALCELLID='+localcell+',DLARFCN=156510,ULARFCNCONFIGIND=NOT_CFG,NRFREQRESELPRIORITY=7,SUBCARRIERSPACING=15KHZ,AGGREGATIONATTRIBUTE=ANR_INDICATION-0&SSB_INDEX_FROM_CELL_INDICATION-1&FIRST_PLMN_RESERVED_INDICATION-0&FREQ_MEAS_FLAG-1&PLMN_RR_INDICATION-0&VG_MODEL_FORBID_BUILD_FLAG-0&DSS_FREQ_INDICATION-0&NR_B1_B2_PLUS_RSRQ_INDICATION-0&SIB24_EXCLUDE_FREQ_INDICATION-0&NR_DL_SCC_FREQ_ONLY_IND-0;'+'{'+NR_NE_name+'}')
+            WriteToAFile(path4,'MOD NRNFREQ:LOCALCELLID='+localcell+',DLARFCN=372750,ULARFCNCONFIGIND=NOT_CFG,NRFREQRESELPRIORITY=7,SUBCARRIERSPACING=15KHZ,AGGREGATIONATTRIBUTE=ANR_INDICATION-0&SSB_INDEX_FROM_CELL_INDICATION-1&FIRST_PLMN_RESERVED_INDICATION-0&FREQ_MEAS_FLAG-1&PLMN_RR_INDICATION-0&VG_MODEL_FORBID_BUILD_FLAG-0&DSS_FREQ_INDICATION-0&NR_B1_B2_PLUS_RSRQ_INDICATION-0&SIB24_EXCLUDE_FREQ_INDICATION-0&NR_DL_SCC_FREQ_ONLY_IND-0;'+'{'+NR_NE_name+'}')
+            #adding also for the 375390 for NR1800 (SA ready HDSS 20/25MHz)
+            WriteToAFile(path4,'MOD NRNFREQ:LOCALCELLID='+localcell+',DLARFCN=375390,ULARFCNCONFIGIND=NOT_CFG,NRFREQRESELPRIORITY=7,SUBCARRIERSPACING=15KHZ,AGGREGATIONATTRIBUTE=ANR_INDICATION-0&SSB_INDEX_FROM_CELL_INDICATION-1&FIRST_PLMN_RESERVED_INDICATION-0&FREQ_MEAS_FLAG-1&PLMN_RR_INDICATION-0&VG_MODEL_FORBID_BUILD_FLAG-0&DSS_FREQ_INDICATION-0&NR_B1_B2_PLUS_RSRQ_INDICATION-0&SIB24_EXCLUDE_FREQ_INDICATION-0&NR_DL_SCC_FREQ_ONLY_IND-0;'+'{'+NR_NE_name+'}')
+            WriteToAFile(path4,'MOD NRNFREQ:LOCALCELLID='+localcell+',DLARFCN=631968,ULARFCNCONFIGIND=NOT_CFG,NRFREQRESELPRIORITY=7,SUBCARRIERSPACING=30KHZ,AGGREGATIONATTRIBUTE=ANR_INDICATION-1&SSB_INDEX_FROM_CELL_INDICATION-1&FIRST_PLMN_RESERVED_INDICATION-0&FREQ_MEAS_FLAG-1&PLMN_RR_INDICATION-0&VG_MODEL_FORBID_BUILD_FLAG-0&DSS_FREQ_INDICATION-0&NR_B1_B2_PLUS_RSRQ_INDICATION-0&SIB24_EXCLUDE_FREQ_INDICATION-0&NR_DL_SCC_FREQ_ONLY_IND-0;'+'{'+NR_NE_name+'}')
+        
+        end      
+
+        # if nrlocalcell in A6[0] and nrlocalcell!='NULL'
+        #     for i in range(0,len(A6[0]))
+        #         if A6[0][i]==nrlocalcell and A6[1][i]=='156510'
+        #             WriteToAFile(path1,'MOD NRNFREQ:LOCALCELLID='+localcell+',DLARFCN=156510,ULARFCNCONFIGIND=NOT_CFG,NRFREQRESELPRIORITY=7,SUBCARRIERSPACING=15KHZ,AGGREGATIONATTRIBUTE=ANR_INDICATION-0&SSB_INDEX_FROM_CELL_INDICATION-1&FIRST_PLMN_RESERVED_INDICATION-0&FREQ_MEAS_FLAG-1&PLMN_RR_INDICATION-0&VG_MODEL_FORBID_BUILD_FLAG-0&DSS_FREQ_INDICATION-0&NR_B1_B2_PLUS_RSRQ_INDICATION-0&SIB24_EXCLUDE_FREQ_INDICATION-0&NR_DL_SCC_FREQ_ONLY_IND-0;'+'{'+NR_NE_name+'}')
+        #             end
+        #         if A6[0][i]==nrlocalcell and A6[1][i]=='372750'
+        #             WriteToAFile(path1,'MOD NRNFREQ:LOCALCELLID='+localcell+',DLARFCN=372750,ULARFCNCONFIGIND=NOT_CFG,NRFREQRESELPRIORITY=7,SUBCARRIERSPACING=15KHZ,AGGREGATIONATTRIBUTE=ANR_INDICATION-0&SSB_INDEX_FROM_CELL_INDICATION-1&FIRST_PLMN_RESERVED_INDICATION-0&FREQ_MEAS_FLAG-1&PLMN_RR_INDICATION-0&VG_MODEL_FORBID_BUILD_FLAG-0&DSS_FREQ_INDICATION-0&NR_B1_B2_PLUS_RSRQ_INDICATION-0&SIB24_EXCLUDE_FREQ_INDICATION-0&NR_DL_SCC_FREQ_ONLY_IND-0;'+'{'+NR_NE_name+'}')
+        #             end
+        #         if A6[0][i]==nrlocalcell and A6[1][i]=='631968' 
+        #             WriteToAFile(path1,'MOD NRNFREQ:LOCALCELLID='+localcell+',DLARFCN=631968,ULARFCNCONFIGIND=NOT_CFG,NRFREQRESELPRIORITY=7,SUBCARRIERSPACING=30KHZ,AGGREGATIONATTRIBUTE=ANR_INDICATION-1&SSB_INDEX_FROM_CELL_INDICATION-1&FIRST_PLMN_RESERVED_INDICATION-0&FREQ_MEAS_FLAG-1&PLMN_RR_INDICATION-0&VG_MODEL_FORBID_BUILD_FLAG-0&DSS_FREQ_INDICATION-0&NR_B1_B2_PLUS_RSRQ_INDICATION-0&SIB24_EXCLUDE_FREQ_INDICATION-0&NR_DL_SCC_FREQ_ONLY_IND-0;'+'{'+NR_NE_name+'}')
+        #             end
+        
+    end
+    WriteToAFile(path2,'\n')
+
+    WriteToAFile(path1,'\n')
+    WriteToAFile(path4,'\n')
+    WriteToAFile(path1,'// On anchored NR node '+NR_NE_name+ ' add for local NR cells all NR frequencies that could be measured ' )
+    A7=com('LST NRCELLFREQRELATION:;',0,'NR Cell ID','SSB Frequency Position')
+    for nrlocalcell in NR_nrlocalcellID_list_unique
+        if nrlocalcell not in A7[0] and nrlocalcell=='200'
+            WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=200,SSBFREQPOS=1956,FREQUENCYBAND=N28,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=5,CONNFREQPRIORITY=5,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+            WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=200,SSBFREQPOS=4659,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+            WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=200,SSBFREQPOS=4692,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+        end
+        if nrlocalcell not in A7[0] and nrlocalcell=='201'
+            WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=201,SSBFREQPOS=1956,FREQUENCYBAND=N28,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=5,CONNFREQPRIORITY=5,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+            WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=201,SSBFREQPOS=4659,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+            WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=201,SSBFREQPOS=4692,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+        end
+        if nrlocalcell not in A7[0] and nrlocalcell=='202'
+            WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=202,SSBFREQPOS=1956,FREQUENCYBAND=N28,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=5,CONNFREQPRIORITY=5,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+            WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=202,SSBFREQPOS=4659,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+            WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=202,SSBFREQPOS=4692,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+        end
+        if nrlocalcell not in A7[0] and nrlocalcell=='210'
+            WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=210,SSBFREQPOS=4659,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=5;'+'{'+NR_NE_name+'}')
+            WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=210,SSBFREQPOS=4692,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=5;'+'{'+NR_NE_name+'}')
+            WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=210,SSBFREQPOS=7832,FREQUENCYBAND=N78,SUBCARRIERSPACING=30KHZ,CELLRESELPRIORITY=7,CONNFREQPRIORITY=7,TRAFFICPRIORITY=7;'+'{'+NR_NE_name+'}')
+        end
+        if nrlocalcell not in A7[0] and nrlocalcell=='211'
+            WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=211,SSBFREQPOS=4659,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=5;'+'{'+NR_NE_name+'}')
+            WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=211,SSBFREQPOS=4692,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=5;'+'{'+NR_NE_name+'}')
+            WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=211,SSBFREQPOS=7832,FREQUENCYBAND=N78,SUBCARRIERSPACING=30KHZ,CELLRESELPRIORITY=7,CONNFREQPRIORITY=7,TRAFFICPRIORITY=7;'+'{'+NR_NE_name+'}')
+        end
+        if nrlocalcell not in A7[0] and nrlocalcell=='212'
+            WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=212,SSBFREQPOS=4659,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=5;'+'{'+NR_NE_name+'}')
+            WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=212,SSBFREQPOS=4692,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=5;'+'{'+NR_NE_name+'}')
+            WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=212,SSBFREQPOS=7832,FREQUENCYBAND=N78,SUBCARRIERSPACING=30KHZ,CELLRESELPRIORITY=7,CONNFREQPRIORITY=7,TRAFFICPRIORITY=7;'+'{'+NR_NE_name+'}')
+        end
+        if nrlocalcell not in A7[0] and nrlocalcell=='220'
+            WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=220,SSBFREQPOS=1956,FREQUENCYBAND=N28,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=5,CONNFREQPRIORITY=5,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+            WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=220,SSBFREQPOS=7832,FREQUENCYBAND=N78,SUBCARRIERSPACING=30KHZ,CELLRESELPRIORITY=7,CONNFREQPRIORITY=7,TRAFFICPRIORITY=7;'+'{'+NR_NE_name+'}')
+        end
+        if nrlocalcell not in A7[0] and nrlocalcell=='221'
+            WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=221,SSBFREQPOS=1956,FREQUENCYBAND=N28,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=5,CONNFREQPRIORITY=5,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+            WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=221,SSBFREQPOS=7832,FREQUENCYBAND=N78,SUBCARRIERSPACING=30KHZ,CELLRESELPRIORITY=7,CONNFREQPRIORITY=7,TRAFFICPRIORITY=7;'+'{'+NR_NE_name+'}')
+        end
+        if nrlocalcell not in A7[0] and nrlocalcell=='222'
+            WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=222,SSBFREQPOS=1956,FREQUENCYBAND=N28,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=5,CONNFREQPRIORITY=5,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+            WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=222,SSBFREQPOS=7832,FREQUENCYBAND=N78,SUBCARRIERSPACING=30KHZ,CELLRESELPRIORITY=7,CONNFREQPRIORITY=7,TRAFFICPRIORITY=7;'+'{'+NR_NE_name+'}')       
+        end
+        if nrlocalcell in A7[0]
+            for i in range(0,len(A7[0]))
+                if A7[0][i]==nrlocalcell and A7[1][i] in NR_DL_SSB_GSCN_list
+                    WriteToAFile(path2,'RMV NRCELLFREQRELATION:NRCELLID='+A7[0][i]+',SSBFREQPOS='+A7[1][i]+';'+'{'+NR_NE_name+'}')
+                    end
+            end
+            #WriteToAFile(path2,'\n')
+
+            if nrlocalcell=='200'
+            WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=200,SSBFREQPOS=1956,FREQUENCYBAND=N28,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=5,CONNFREQPRIORITY=5,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+            WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=200,SSBFREQPOS=4659,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+            WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=200,SSBFREQPOS=4692,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+            
+            WriteToAFile(path4,'MOD NRCELLFREQRELATION:NRCELLID=200,SSBFREQPOS=1956,FREQUENCYBAND=N28,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=5,CONNFREQPRIORITY=5,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+            WriteToAFile(path4,'MOD NRCELLFREQRELATION:NRCELLID=200,SSBFREQPOS=4659,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+            WriteToAFile(path4,'MOD NRCELLFREQRELATION:NRCELLID=200,SSBFREQPOS=4692,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+            end
+            if nrlocalcell=='201'
+                WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=201,SSBFREQPOS=1956,FREQUENCYBAND=N28,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=5,CONNFREQPRIORITY=5,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+                WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=201,SSBFREQPOS=4659,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+                WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=201,SSBFREQPOS=4692,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+                
+                WriteToAFile(path4,'MOD NRCELLFREQRELATION:NRCELLID=201,SSBFREQPOS=1956,FREQUENCYBAND=N28,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=5,CONNFREQPRIORITY=5,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+                WriteToAFile(path4,'MOD NRCELLFREQRELATION:NRCELLID=201,SSBFREQPOS=4659,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+                WriteToAFile(path4,'MOD NRCELLFREQRELATION:NRCELLID=201,SSBFREQPOS=4692,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+
+            end
+            if nrlocalcell=='202'
+                WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=202,SSBFREQPOS=1956,FREQUENCYBAND=N28,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=5,CONNFREQPRIORITY=5,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+                WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=202,SSBFREQPOS=4659,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+                WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=202,SSBFREQPOS=4692,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+                
+                WriteToAFile(path4,'MOD NRCELLFREQRELATION:NRCELLID=202,SSBFREQPOS=1956,FREQUENCYBAND=N28,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=5,CONNFREQPRIORITY=5,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+                WriteToAFile(path4,'MOD NRCELLFREQRELATION:NRCELLID=202,SSBFREQPOS=4659,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+                WriteToAFile(path4,'MOD NRCELLFREQRELATION:NRCELLID=202,SSBFREQPOS=4692,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+
+            end
+            if nrlocalcell=='210'
+                WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=210,SSBFREQPOS=4659,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=5;'+'{'+NR_NE_name+'}')
+                WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=210,SSBFREQPOS=4692,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=5;'+'{'+NR_NE_name+'}')
+                WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=210,SSBFREQPOS=7832,FREQUENCYBAND=N78,SUBCARRIERSPACING=30KHZ,CELLRESELPRIORITY=7,CONNFREQPRIORITY=7,TRAFFICPRIORITY=7;'+'{'+NR_NE_name+'}')
+
+                WriteToAFile(path4,'MOD NRCELLFREQRELATION:NRCELLID=210,SSBFREQPOS=4659,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=5;'+'{'+NR_NE_name+'}')
+                WriteToAFile(path4,'MOD NRCELLFREQRELATION:NRCELLID=210,SSBFREQPOS=4692,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=5;'+'{'+NR_NE_name+'}')
+                WriteToAFile(path4,'MOD NRCELLFREQRELATION:NRCELLID=210,SSBFREQPOS=7832,FREQUENCYBAND=N78,SUBCARRIERSPACING=30KHZ,CELLRESELPRIORITY=7,CONNFREQPRIORITY=7,TRAFFICPRIORITY=7;'+'{'+NR_NE_name+'}')
+
+            end
+            if nrlocalcell=='211'
+                WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=211,SSBFREQPOS=4659,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=5;'+'{'+NR_NE_name+'}')
+                WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=211,SSBFREQPOS=4692,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=5;'+'{'+NR_NE_name+'}')
+                WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=211,SSBFREQPOS=7832,FREQUENCYBAND=N78,SUBCARRIERSPACING=30KHZ,CELLRESELPRIORITY=7,CONNFREQPRIORITY=7,TRAFFICPRIORITY=7;'+'{'+NR_NE_name+'}')
+
+                WriteToAFile(path4,'MOD NRCELLFREQRELATION:NRCELLID=211,SSBFREQPOS=4659,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=5;'+'{'+NR_NE_name+'}')
+                WriteToAFile(path4,'MOD NRCELLFREQRELATION:NRCELLID=211,SSBFREQPOS=4692,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=5;'+'{'+NR_NE_name+'}')
+                WriteToAFile(path4,'MOD NRCELLFREQRELATION:NRCELLID=211,SSBFREQPOS=7832,FREQUENCYBAND=N78,SUBCARRIERSPACING=30KHZ,CELLRESELPRIORITY=7,CONNFREQPRIORITY=7,TRAFFICPRIORITY=7;'+'{'+NR_NE_name+'}')
+
+            
+            end
+            if nrlocalcell=='212'
+                WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=212,SSBFREQPOS=4659,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=5;'+'{'+NR_NE_name+'}')
+                WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=212,SSBFREQPOS=7832,FREQUENCYBAND=N78,SUBCARRIERSPACING=30KHZ,CELLRESELPRIORITY=7,CONNFREQPRIORITY=7,TRAFFICPRIORITY=7;'+'{'+NR_NE_name+'}')
+                WriteToAFile(path4,'MOD NRCELLFREQRELATION:NRCELLID=212,SSBFREQPOS=4659,FREQUENCYBAND=N3,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=6,CONNFREQPRIORITY=6,TRAFFICPRIORITY=5;'+'{'+NR_NE_name+'}')
+                WriteToAFile(path4,'MOD NRCELLFREQRELATION:NRCELLID=212,SSBFREQPOS=7832,FREQUENCYBAND=N78,SUBCARRIERSPACING=30KHZ,CELLRESELPRIORITY=7,CONNFREQPRIORITY=7,TRAFFICPRIORITY=7;'+'{'+NR_NE_name+'}')
+
+                end
+            if nrlocalcell=='220'
+                WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=220,SSBFREQPOS=1956,FREQUENCYBAND=N28,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=5,CONNFREQPRIORITY=5,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+                WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=220,SSBFREQPOS=7832,FREQUENCYBAND=N78,SUBCARRIERSPACING=30KHZ,CELLRESELPRIORITY=7,CONNFREQPRIORITY=7,TRAFFICPRIORITY=7;'+'{'+NR_NE_name+'}')
+                WriteToAFile(path4,'MOD NRCELLFREQRELATION:NRCELLID=220,SSBFREQPOS=1956,FREQUENCYBAND=N28,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=5,CONNFREQPRIORITY=5,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+                WriteToAFile(path4,'MOD NRCELLFREQRELATION:NRCELLID=220,SSBFREQPOS=7832,FREQUENCYBAND=N78,SUBCARRIERSPACING=30KHZ,CELLRESELPRIORITY=7,CONNFREQPRIORITY=7,TRAFFICPRIORITY=7;'+'{'+NR_NE_name+'}')
+
+            end
+            if nrlocalcell=='221'
+                WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=221,SSBFREQPOS=1956,FREQUENCYBAND=N28,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=5,CONNFREQPRIORITY=5,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+                WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=221,SSBFREQPOS=7832,FREQUENCYBAND=N78,SUBCARRIERSPACING=30KHZ,CELLRESELPRIORITY=7,CONNFREQPRIORITY=7,TRAFFICPRIORITY=7;'+'{'+NR_NE_name+'}')
+                WriteToAFile(path4,'MOD NRCELLFREQRELATION:NRCELLID=221,SSBFREQPOS=1956,FREQUENCYBAND=N28,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=5,CONNFREQPRIORITY=5,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+                WriteToAFile(path4,'MOD NRCELLFREQRELATION:NRCELLID=221,SSBFREQPOS=7832,FREQUENCYBAND=N78,SUBCARRIERSPACING=30KHZ,CELLRESELPRIORITY=7,CONNFREQPRIORITY=7,TRAFFICPRIORITY=7;'+'{'+NR_NE_name+'}')
+
+            end
+            if nrlocalcell=='222'
+                WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=222,SSBFREQPOS=1956,FREQUENCYBAND=N28,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=5,CONNFREQPRIORITY=5,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+                WriteToAFile(path1,'ADD NRCELLFREQRELATION:NRCELLID=222,SSBFREQPOS=7832,FREQUENCYBAND=N78,SUBCARRIERSPACING=30KHZ,CELLRESELPRIORITY=7,CONNFREQPRIORITY=7,TRAFFICPRIORITY=7;'+'{'+NR_NE_name+'}')       
+                WriteToAFile(path4,'MOD NRCELLFREQRELATION:NRCELLID=222,SSBFREQPOS=1956,FREQUENCYBAND=N28,SUBCARRIERSPACING=15KHZ,CELLRESELPRIORITY=5,CONNFREQPRIORITY=5,TRAFFICPRIORITY=0;'+'{'+NR_NE_name+'}')
+                WriteToAFile(path4,'MOD NRCELLFREQRELATION:NRCELLID=222,SSBFREQPOS=7832,FREQUENCYBAND=N78,SUBCARRIERSPACING=30KHZ,CELLRESELPRIORITY=7,CONNFREQPRIORITY=7,TRAFFICPRIORITY=7;'+'{'+NR_NE_name+'}')       
+            
+            end
+        end
+    end
+else
+    WriteToAFile(path1, '\n// '+NR_NE_name+ ' is disconnected or on another OSS server.\n')
+end
+WriteToAFile(path2,'\n')
+
+
+# collect Live network neighbor relations data for NR Anchored NE
+if ConnectNE(NR_NE_name)
+    A8=com('LST NREXTERNALCELL:;',0,'gNodeB ID','Cell ID')
+    NREXTERNALCELL_gnbID_list=A8[0]
+    NREXTERNALCELL_CellID_list=A8[1]
+    A10=com('LST NRNRELATIONSHIP:;',0,'Local cell ID','gNodeB ID','Cell ID')
+    NRNRELATIONSHIP_LocalcellID=A10[0]
+    NRNRELATIONSHIP_gnbid=A10[1]
+    NRNRELATIONSHIP_cellID=A10[2][0]
+    A11=com('LST NREXTERNALNCELL:;',0,'gNodeB ID','Cell ID')
+    NREXTERNALNCELL_gnbID_list=A11[0]
+    NREXTERNALNCELL_CellID_list=A11[1]
+    A12=com('LST NRCELLRELATION:;',0,'NR Cell ID','gNodeB ID','Cell ID')
+    NRCELLRELATION_LocalcellID=A12[0]
+    NRCELLRELATION_gnbid=A12[1]
+    NRCELLRELATION_cellID=A12[2][0]
+else
+    WriteToAFile(path1, '\n// '+NR_NE_name+ ' is disconnected or on another OSS server.\n')
+    NREXTERNALCELL_gnbID_list=[]
+    NREXTERNALCELL_CellID_list=[]
+    NRNRELATIONSHIP_LocalcellID=[]
+    NREXTERNALNCELL_gnbID_list=[]
+    NREXTERNALNCELL_CellID_list=[]
+    NRCELLRELATION_LocalcellID=[]
+    NRCELLRELATION_gnbid=[]
+    NRCELLRELATION_cellID=[]
+
+end
+
+# collect Live network neighbor relations for LTE Anchor NE
+if ConnectNE(Anchor_NE_name)
+    A9=com('LST NREXTERNALCELL:;',0,'gNodeB ID','Cell ID')
+    NREXTERNALCELL_gnbID_list_1=A9[0]
+    NREXTERNALCELL_CellID_list_1=A9[1]
+else
+    NREXTERNALCELL_gnbID_list_1=[]
+    NREXTERNALCELL_CellID_list_1=[]
+    WriteToAFile(path11, '\n// '+Anchor_NE_name+ ' is disconnected or on another OSS server.\n')
+
+end
+
+"""
+form1 = CreateForm('Inter ENB Anchoring', ['Confirm', 'Cancel'])
+Enter(form1)
+flag_onlytdd=CheckBox(form1, 450, "only NR TDD")
+Enter(form1)
+Label(form1, 180, ' Anchoring info file:')
+a1 = FileChooser(form1, 'csv')
+Enter(form1)
+Label(form1, 180, ' 5G_pool_DU.csv file:')
+a2 = FileChooser(form1, 'csv')
+Enter(form1)
+Label(form1, 180, ' 5G_pool_CU.csv file')
+a3 = FileChooser(form1, 'csv')
+userSelect = ShowForm(form1)
+"""
+if userSelect == 'Confirm'
+    if GetValue(a1)!=[]
+        Anchor_file = Open(GetValue(a1), encoding = "ISO-8859-1")
+        content_Anchor_file=ReadCSVFile(Anchor_file)
+        # Print(content_Anchor_file)
+        len_content_Anchor_file=len(content_Anchor_file)
+        end
+    if GetValue(a2)!=[]
+        DU_file = Open(GetValue(a2), encoding = "ISO-8859-1")
+        content_DU_file=ReadCSVFile(DU_file)
+        len_content_DU_file=len(content_DU_file)
+    end
+    if GetValue(a3)!=[]
+        CU_file = Open(GetValue(a3), encoding = "ISO-8859-1")
+        content_CU_file=ReadCSVFile(CU_file)
+        len_content_CU_file=len(content_CU_file)
+    end
+
+    WriteToAFile(path1,'\n')
+    WriteToAFile(path1,'// On anchored NR node '+NR_NE_name+', add NR external cells for Local 4G cells, from other surrounding gNodeBs, including co-located NR cells ' )
+    WriteToAFile(path1,'// On anchored NR node '+NR_NE_name+ ' add NRNRELATIONSHIP (4G5G relations) to surrounding gNodeBs, including  NR cells of the Anchored site ' +NR_NE_name )
+    WriteToAFile(path1,'// Adding 4G5G relations for all external and co-located gNodeB cells for all co-located LTE cells of an anchored 4G/5G site')
+    WriteToAFile(path1,'// taken from: zell_nr_zell_nr_yyyymmdd.xls -> NR external cells to be added for anchored NR NE '+NR_NE_name)
+
+    
+    
+
+
+    #collect data from Anchor file
+    Anchor_file_NR_external_cells_col1=[]
+    Anchor_file_NR_external_cells_col1_unique=[]
+    Anchor_file_NR_external_cells_col3=[]
+    Anchor_file_NR_external_cells_col3_unique=[]
+    Anchor_file_LTE_Anchored_Source_cells_col0=[]
+    Anchor_file_LTE_Anchor_Source_cells_col2=[]
+
+    for k in range(1,len_content_Anchor_file)
+        if content_Anchor_file[k][1]!='x'
+            Anchor_file_NR_external_cells_col1.append(content_Anchor_file[k][1])
+
+        end
+        # Print(Anchor_file_NR_external_cells_col1)
+        if content_Anchor_file[k][0]!='x'
+            Anchor_file_LTE_Anchored_Source_cells_col0.append(content_Anchor_file[k][0])
+            
+        end
+        # Print(Anchor_file_LTE_Anchored_Source_cells_col0)
+        # determining unique NR externals from Anchoring file column B and checking in they are planned for the Anchored site.
+        if content_Anchor_file[k][1] not in Anchor_file_NR_external_cells_col1_unique and content_Anchor_file[k][1]!='NR external' and content_Anchor_file[k][0][0]==NR_NE_name[0] and content_Anchor_file[k][0][3:6]==NR_NE_name[3:6]
+            Anchor_file_NR_external_cells_col1_unique.append(content_Anchor_file[k][1])
+            end
+
+        if content_Anchor_file[k][3]!='x'
+            Anchor_file_NR_external_cells_col3.append(content_Anchor_file[k][3])
+        end
+        # Print(Anchor_file_NR_external_cells_col3)
+        if content_Anchor_file[k][2]!='x'
+            Anchor_file_LTE_Anchor_Source_cells_col2.append(content_Anchor_file[k][2])
+        end
+        # Print(Anchor_file_LTE_Anchor_Source_cells_col2)
+        # determining unique NR externals from Anchoring file column D and checking if they are planned for the Anchor site.
+        if content_Anchor_file[k][3] not in Anchor_file_NR_external_cells_col3_unique and content_Anchor_file[k][3]!='NR external' and content_Anchor_file[k][2][0]==Anchor_NE_name[0] and content_Anchor_file[k][2][3:6]==Anchor_NE_name[3:6]
+            Anchor_file_NR_external_cells_col3_unique.append(content_Anchor_file[k][3])
+            end     ############################################################ccheck error here!!!!!!!!!!!
+    end
+
+    #write NREXTERNALCELL data for NR_NE_name
+    Print('\n')
+    Print('List of '+str(len(Anchor_file_NR_external_cells_col1_unique))+' NR external cells to be added for '+NR_NE_name)
+    Print(Anchor_file_NR_external_cells_col1_unique)
+    # WriteToAFile(path1,'// from: zell_nr_zell_nr_yyyymmdd.xls -> NR external cells to be added for anchored NR NE'+NR_NE_name')
+    WriteToAFile(path1,'// Number of NR externals: '+str(len(Anchor_file_NR_external_cells_col1_unique)))
+    WriteToAFile(path1,'// '+','.join(Anchor_file_NR_external_cells_col1_unique))
+    WriteToAFile(path1,'\n')
+    #ADD NREXTERNALCELL:Mcc="262",Mnc="02",GnodebId=21334,CellId=201,DlArfcn=7832,PhyCellId=888,Tac=43400;
+    
+    # bellow are tuple lists with nrcellname positions and nrcell name in the csv
+    Print('\n')
+    Print(' lists of tuples with nrcellname positions from the CU,DU csv for Anchored NR site')
+    content_CU_file_nrcellname_position_list=csv_parser(content_CU_file,len_content_CU_file,Anchor_file_NR_external_cells_col1_unique,dict_choices_region[str(GetValue(hRadio1))])
+    Print(content_CU_file_nrcellname_position_list)
+    content_DU_file_nrcellname_position_list=csv_parser(content_DU_file,len_content_DU_file,Anchor_file_NR_external_cells_col1_unique,dict_choices_region[str(GetValue(hRadio1))])
+    Print(content_DU_file_nrcellname_position_list)
+    
+    #each iteration of this for is for one NR external cell
+    for item in range(0,len(Anchor_file_NR_external_cells_col1_unique))
+        gnbId=content_CU_file[content_CU_file_nrcellname_position_list[item][0]][content_CU_file_nrcellname_position_list[item][1]-7]
+        GNBTAC=content_DU_file[content_DU_file_nrcellname_position_list[item][0]][content_DU_file_nrcellname_position_list[item][1]-9]
+        NR_PCI=content_DU_file[content_DU_file_nrcellname_position_list[item][0]][content_DU_file_nrcellname_position_list[item][1]-8]
+        #added 06Mar
+        NR_ARFCN=content_DU_file[content_DU_file_nrcellname_position_list[item][0]][content_DU_file_nrcellname_position_list[item][1]-4]
+        #Print(NR_ARFCN+" "++Anchor_file_NR_external_cells_col1_unique[item]+" "+NR_PCI)
+        # can also import the DL ARFCN and not use it hard coded as bellow!
+        
+        if Anchor_file_NR_external_cells_col1_unique[item][1]=='R' and Anchor_file_NR_external_cells_col1_unique[item][6]=='A'
+            DlArfcn='631968'
+            CellId='201'
+        elif Anchor_file_NR_external_cells_col1_unique[item][1]=='R' and Anchor_file_NR_external_cells_col1_unique[item][6]=='B'
+            DlArfcn='631968'
+            CellId='202'
+        elif Anchor_file_NR_external_cells_col1_unique[item][1]=='R' and Anchor_file_NR_external_cells_col1_unique[item][6]=='C'
+            DlArfcn='631968'
+            CellId='203'
+        elif Anchor_file_NR_external_cells_col1_unique[item][1]=='R' and Anchor_file_NR_external_cells_col1_unique[item][6]=='D'
+            DlArfcn='631968'
+            CellId='204'
+        elif Anchor_file_NR_external_cells_col1_unique[item][1]=='P' and Anchor_file_NR_external_cells_col1_unique[item][6]=='A'
+            DlArfcn='156510'
+            CellId='211'
+        elif Anchor_file_NR_external_cells_col1_unique[item][1]=='P' and Anchor_file_NR_external_cells_col1_unique[item][6]=='B'
+            DlArfcn='156510'
+            CellId='212'
+        elif Anchor_file_NR_external_cells_col1_unique[item][1]=='P' and Anchor_file_NR_external_cells_col1_unique[item][6]=='C'
+            DlArfcn='156510'
+            CellId='213'
+        elif Anchor_file_NR_external_cells_col1_unique[item][1]=='P' and Anchor_file_NR_external_cells_col1_unique[item][6]=='D'
+            DlArfcn='156510'
+            CellId='214'
+
+        # could also implement for the other NR1800 frequency DLARFCN 375390/GSCN 4692
+        elif Anchor_file_NR_external_cells_col1_unique[item][1]=='K' and Anchor_file_NR_external_cells_col1_unique[item][6]=='A' and NR_ARFCN in ["4659","4692"]
+            DlArfcn=NR_GSCN_ARFCN_dict[NR_ARFCN]
+            CellId='221'
+        elif Anchor_file_NR_external_cells_col1_unique[item][1]=='K' and Anchor_file_NR_external_cells_col1_unique[item][6]=='B' and NR_ARFCN in ["4659","4692"]
+            DlArfcn=NR_GSCN_ARFCN_dict[NR_ARFCN]
+            CellId='222'
+        elif Anchor_file_NR_external_cells_col1_unique[item][1]=='K' and Anchor_file_NR_external_cells_col1_unique[item][6]=='C' and NR_ARFCN in ["4659","4692"]
+            DlArfcn=NR_GSCN_ARFCN_dict[NR_ARFCN]
+            CellId='223'
+        elif Anchor_file_NR_external_cells_col1_unique[item][1]=='K' and Anchor_file_NR_external_cells_col1_unique[item][6]=='D' and NR_ARFCN in ["4659","4692"]
+            DlArfcn=NR_GSCN_ARFCN_dict[NR_ARFCN]
+            CellId='224'
+        else
+            DlArfcn='NOT DETERMINED'
+            CellId='NOT DETERMINED'
+        end
+
+        #check if the NREXTERNALCELL is already there
+        if len(NREXTERNALCELL_gnbID_list)>0
+            for ii in range(0, len(NREXTERNALCELL_gnbID_list))
+                if NREXTERNALCELL_gnbID_list[ii]==gnbId and NREXTERNALCELL_CellID_list[ii]==CellId
+                    WriteToAFile(path2,'RMV NREXTERNALCELL:GNODEBID='+gnbId+',CELLID='+CellId+';'+'{'+NR_NE_name+'}')
+                end
+            end
+        end
+        #WriteToAFile(path2,'\n')
+
+        if gnbId=='NCI' 
+            WriteToAFile(path1,'//  No cell '+Anchor_file_NR_external_cells_col1_unique[item])
+            WriteToAFile(path4,'//  No cell '+Anchor_file_NR_external_cells_col1_unique[item])
+            
+        else
+            WriteToAFile(path1,'// Add external  '+Anchor_file_NR_external_cells_col1_unique[item])
+            WriteToAFile(path1,'ADD NREXTERNALCELL:Mcc="262",Mnc="02",GnodebId='+gnbId+',CellId='+CellId+',DlArfcn='+DlArfcn+',PhyCellId='+NR_PCI+',Tac='+GNBTAC+';'+'{'+NR_NE_name+'}')
+            WriteToAFile(path4,'// Mod external  '+Anchor_file_NR_external_cells_col1_unique[item])
+            WriteToAFile(path4,'MOD NREXTERNALCELL:Mcc="262",Mnc="02",GnodebId='+gnbId+',CellId='+CellId+',DlArfcn='+DlArfcn+',PhyCellId='+NR_PCI+',Tac='+GNBTAC+';'+'{'+NR_NE_name+'}')
+        end
+
+        # check if TDD for N relation objects
+        if Anchor_file_NR_external_cells_col1_unique[item][1] in ['K','P'] and GetValue(flag_onlytdd) ==True
+            comment_mml_line ='//'
+        else 
+            comment_mml_line =''
+        end
+
+        #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        # Adding/deleting the 4G5G relations on the Anchored site for each external cell, according to planning
+        ##ADD NRNRELATIONSHIP:LOCALCELLID=19,MCC="262",MNC="02",GNODEBID=21334,CELLID=223,AGGREGATIONATTRIBUTE=NO_REMOVE_FLAG-1;
+
+        NRNRELATIONSHIP_LTE_locallcellID_planned_list=[]  #list will be constructed to retain the planned local cellID for which we will add 4G5G relation towards the peer NR external
+        for ii in range(0, len(Anchor_file_NR_external_cells_col1))
+            if Anchor_file_NR_external_cells_col1[ii]==Anchor_file_NR_external_cells_col1_unique[item] and gnbId!='NCI'
+                ltecellId=ltecellname2localid(Anchor_file_LTE_Anchored_Source_cells_col0[ii])
+                WriteToAFile(path1,comment_mml_line+'ADD NRNRELATIONSHIP:LocalCellId='+ltecellId+',Mcc="262",Mnc="02",GnodebId='+gnbId+',CellId='+CellId+',AggregationAttribute=NO_REMOVE_FLAG-1;'+'{'+NR_NE_name+'}')
+                WriteToAFile(path4,comment_mml_line+'MOD NRNRELATIONSHIP:LocalCellId='+ltecellId+',Mcc="262",Mnc="02",GnodebId='+gnbId+',CellId='+CellId+',AggregationAttribute=NO_REMOVE_FLAG-1;'+'{'+NR_NE_name+'}')
+
+                NRNRELATIONSHIP_LTE_locallcellID_planned_list.append(ltecellId)
+            end
+        end
+
+        #remove already existing NRNRELATIONSHIP for the planned NR external on each local cell included in NRNRELATIONSHIP_LTE_locallcellID_planned_list
+        if len(NRNRELATIONSHIP_LocalcellID)>0
+            for iii in range(0,len(NRNRELATIONSHIP_LocalcellID))
+                if NRNRELATIONSHIP_gnbid[iii]==gnbId and NRNRELATIONSHIP_cellID[iii]==CellId and NRNRELATIONSHIP_LocalcellID[iii] in NRNRELATIONSHIP_LTE_locallcellID_planned_list
+                    WriteToAFile(path2,'RMV NRNRELATIONSHIP:LOCALCELLID='+NRNRELATIONSHIP_LocalcellID[iii]+',GNODEBID='+NRNRELATIONSHIP_gnbid[iii]+',CELLID='+NRNRELATIONSHIP_cellID[iii]+';'+'{'+NR_NE_name+'}')
+                end
+            end
+        end
+        WriteToAFile(path2,'\n')
+        WriteToAFile(path1,'\n')
+        WriteToAFile(path4,'\n')
+    end
+
+
+    WriteToAFile(path1,'\n')
+    WriteToAFile(path11,'\n')
+    WriteToAFile(path11,'// On anchor LTE node '+Anchor_NE_name+ ' add NR external cells to other surrounding gNodeBs, including  NR cells of the Anchored site ' +NR_NE_name )
+    
+
+    #write NREXTERNALCELL data for Anchor_NE_name
+    # Print('NR external cells from columns D in  Anchor file')
+    # Print(Anchor_file_NR_external_cells_col3_unique)
+    Print('\n')
+    Print('List of '+str(len(Anchor_file_NR_external_cells_col3_unique))+' NR external cells to be added for '+Anchor_NE_name)
+    Print(Anchor_file_NR_external_cells_col3_unique)
+    # WriteToAFile(path1,'// from: zell_nr_zell_nr_yyyymmdd.xls -> NR external cells to be added for anchored NR NE'+NR_NE_name')
+    WriteToAFile(path11,'// Number of NR externals: '+str(len(Anchor_file_NR_external_cells_col3_unique)))
+    WriteToAFile(path11,'// '+','.join(Anchor_file_NR_external_cells_col3_unique))
+    WriteToAFile(path11,'\n')
+    WriteToAFile(path44,'\n')
+    #ADD NREXTERNALCELL:Mcc="262",Mnc="02",GnodebId=21334,CellId=201,DlArfcn=7832,PhyCellId=888,Tac=43400;
+
+    # bellow are tuple lists with nrcellname positions in the csv
+    Print('\n')
+    Print(' lists of tuples with nrcellname positions from the CU, DU csv for Anchor LTE site')
+    content_CU_file_nrcellname_position_list_1=csv_parser(content_CU_file,len_content_CU_file,Anchor_file_NR_external_cells_col3_unique,dict_choices_region[str(GetValue(hRadio1))])
+    Print(content_CU_file_nrcellname_position_list_1)
+    content_DU_file_nrcellname_position_list_1=csv_parser(content_DU_file,len_content_DU_file,Anchor_file_NR_external_cells_col3_unique,dict_choices_region[str(GetValue(hRadio1))])
+    Print(content_DU_file_nrcellname_position_list_1)
+    
+    for item in range(0,len(Anchor_file_NR_external_cells_col3_unique))
+        gnbId_1=content_CU_file[content_CU_file_nrcellname_position_list_1[item][0]][content_CU_file_nrcellname_position_list_1[item][1]-7]
+        GNBTAC_1=content_DU_file[content_DU_file_nrcellname_position_list_1[item][0]][content_DU_file_nrcellname_position_list_1[item][1]-9]
+        NR_PCI_1=content_DU_file[content_DU_file_nrcellname_position_list_1[item][0]][content_DU_file_nrcellname_position_list_1[item][1]-8]
+        #added 06mar
+        NR_ARFCN_1=content_DU_file[content_DU_file_nrcellname_position_list_1[item][0]][content_DU_file_nrcellname_position_list_1[item][1]-4]
+        #Print(NR_ARFCN_1+"  "+Anchor_file_NR_external_cells_col3_unique[item]+" "+NR_PCI_1)
+
+        if Anchor_file_NR_external_cells_col3_unique[item][1]=='R' and Anchor_file_NR_external_cells_col3_unique[item][6]=='A' 
+            DlArfcn_1='631968'
+            CellId_1='201'
+        elif Anchor_file_NR_external_cells_col3_unique[item][1]=='R' and Anchor_file_NR_external_cells_col3_unique[item][6]=='B'
+            DlArfcn_1='631968'
+            CellId_1='202'
+        elif Anchor_file_NR_external_cells_col3_unique[item][1]=='R' and Anchor_file_NR_external_cells_col3_unique[item][6]=='C'
+            DlArfcn_1='631968'
+            CellId_1='203'
+        elif Anchor_file_NR_external_cells_col3_unique[item][1]=='R' and Anchor_file_NR_external_cells_col3_unique[item][6]=='D'
+            DlArfcn_1='631968'
+            CellId_1='204'
+        elif Anchor_file_NR_external_cells_col3_unique[item][1]=='P' and Anchor_file_NR_external_cells_col3_unique[item][6]=='A'
+            DlArfcn_1='156510'
+            CellId_1='211'
+        elif Anchor_file_NR_external_cells_col3_unique[item][1]=='P' and Anchor_file_NR_external_cells_col3_unique[item][6]=='B'
+            DlArfcn_1='156510'
+            CellId_1='212'
+        elif Anchor_file_NR_external_cells_col3_unique[item][1]=='P' and Anchor_file_NR_external_cells_col3_unique[item][6]=='C'
+            DlArfcn_1='156510'
+            CellId_1='213'
+        elif Anchor_file_NR_external_cells_col3_unique[item][1]=='P' and Anchor_file_NR_external_cells_col3_unique[item][6]=='D'
+            DlArfcn_1='156510'
+            CellId_1='214'
+        elif Anchor_file_NR_external_cells_col3_unique[item][1]=='K' and Anchor_file_NR_external_cells_col3_unique[item][6]=='A'  and NR_ARFCN_1 in ["4659","4692"]
+            DlArfcn_1=NR_GSCN_ARFCN_dict[NR_ARFCN_1]
+            CellId_1='221'
+        elif Anchor_file_NR_external_cells_col3_unique[item][1]=='K' and Anchor_file_NR_external_cells_col3_unique[item][6]=='B'  and NR_ARFCN_1 in ["4659","4692"]
+            DlArfcn_1=NR_GSCN_ARFCN_dict[NR_ARFCN_1]
+            CellId_1='222'
+        elif Anchor_file_NR_external_cells_col3_unique[item][1]=='K' and Anchor_file_NR_external_cells_col3_unique[item][6]=='C'  and NR_ARFCN_1 in ["4659","4692"]
+            DlArfcn_1=NR_GSCN_ARFCN_dict[NR_ARFCN_1]
+            CellId_1='223'
+        elif Anchor_file_NR_external_cells_col3_unique[item][1]=='K' and Anchor_file_NR_external_cells_col3_unique[item][6]=='D'  and NR_ARFCN_1 in ["4659","4692"]
+            DlArfcn_1=NR_GSCN_ARFCN_dict[NR_ARFCN_1]
+            CellId_1='224'
+        else
+            DlArfcn_1='NOT DETERMINED'
+            CellId_1='NOT DETERMINED'
+        end
+
+        #check if the NREXTERNALCELL is already there
+        if len(NREXTERNALCELL_gnbID_list_1)>0 and len(NREXTERNALCELL_CellID_list_1)>0
+            for ii in range(0, len(NREXTERNALCELL_gnbID_list_1))
+                if NREXTERNALCELL_gnbID_list_1[ii]==gnbId_1 and NREXTERNALCELL_CellID_list_1[ii]==CellId_1
+                    WriteToAFile(path22,'RMV NREXTERNALCELL:GNODEBID='+gnbId_1+',CELLID='+CellId_1+';'+'{'+Anchor_NE_name+'}')
+                end
+            end
+        end
+        #WriteToAFile(path2,'\n')
+
+        if gnbId_1=='NCI' 
+             WriteToAFile(path11,'//  No cell '+Anchor_file_NR_external_cells_col3_unique[item])
+             WriteToAFile(path44,'//  No cell '+Anchor_file_NR_external_cells_col3_unique[item])
+
+        else
+            WriteToAFile(path11,'// Add external  '+Anchor_file_NR_external_cells_col3_unique[item])
+            WriteToAFile(path11,'ADD NREXTERNALCELL:Mcc="262",Mnc="02",GnodebId='+gnbId_1+',CellId='+CellId_1+',DlArfcn='+DlArfcn_1+',PhyCellId='+NR_PCI_1+',Tac='+GNBTAC_1+';'+'{'+Anchor_NE_name+'}')
+            WriteToAFile(path44,'// Mod external  '+Anchor_file_NR_external_cells_col3_unique[item])
+            WriteToAFile(path44,'MOD NREXTERNALCELL:Mcc="262",Mnc="02",GnodebId='+gnbId_1+',CellId='+CellId_1+',DlArfcn='+DlArfcn_1+',PhyCellId='+NR_PCI_1+',Tac='+GNBTAC_1+';'+'{'+Anchor_NE_name+'}')
+        end
+        # check if TDD for N relation objects
+        if Anchor_file_NR_external_cells_col3_unique[item][1] in ['K','P'] and GetValue(flag_onlytdd) ==True
+            comment_mml_line ='//'
+        else 
+            comment_mml_line =''
+        end
+
+        NRNRELATIONSHIP_LTE_locallcellID_planned_list_forAnchor=[]  #list will be constructed to retain the planned local cellID for which we will add 4G5G relation towards the peer NR external
+        for ii in range(0, len(Anchor_file_NR_external_cells_col3))
+            if Anchor_file_NR_external_cells_col3[ii]==Anchor_file_NR_external_cells_col3_unique[item] and gnbId_1!='NCI'
+                ltecellId_1=ltecellname2localid(Anchor_file_LTE_Anchor_Source_cells_col2[ii])
+                WriteToAFile(path11,comment_mml_line+'ADD NRNRELATIONSHIP:LocalCellId='+ltecellId_1+',Mcc="262",Mnc="02",GnodebId='+gnbId_1+',CellId='+CellId_1+',AggregationAttribute=NO_REMOVE_FLAG-1;'+'{'+Anchor_NE_name+'}')
+                WriteToAFile(path44,comment_mml_line+'MOD NRNRELATIONSHIP:LocalCellId='+ltecellId_1+',Mcc="262",Mnc="02",GnodebId='+gnbId_1+',CellId='+CellId_1+',AggregationAttribute=NO_REMOVE_FLAG-1;'+'{'+Anchor_NE_name+'}')
+
+                NRNRELATIONSHIP_LTE_locallcellID_planned_list_forAnchor.append(ltecellId_1)
+            end
+        end
+        WriteToAFile(path11,'\n')
+    end
+
+    WriteToAFile(path2,'\n')
+    WriteToAFile(path1,'\n')
+    WriteToAFile(path11,'\n')
+    WriteToAFile(path1,'// On anchored NR node '+NR_NE_name+', add NR external cells for Local 5G cells, from other surrounding gNodeBs, including co-located NR cells ' )
+
+    Anchor_file_NR_external_cells_col5=[]
+    Anchor_file_NR_external_cells_col5_unique=[]
+    Anchor_file_NR_Anchored_Source_cells_col4=[]
+
+
+    for k in range(1,len_content_Anchor_file)
+        if content_Anchor_file[k][5]!='x'
+            Anchor_file_NR_external_cells_col5.append(content_Anchor_file[k][5])
+
+        end
+        # Print(Anchor_file_NR_external_cells_col4)
+        if content_Anchor_file[k][4]!='x'
+            Anchor_file_NR_Anchored_Source_cells_col4.append(content_Anchor_file[k][4])
+            
+        end
+        
+        # determining unique NR externals from Anchoring file column F and checking in they are planned for the Anchored site.
+        if content_Anchor_file[k][5] not in Anchor_file_NR_external_cells_col5_unique and content_Anchor_file[k][5]!='NR external' and content_Anchor_file[k][4][0]==NR_NE_name[0] and content_Anchor_file[k][4][3:6]==NR_NE_name[3:6]
+            Anchor_file_NR_external_cells_col5_unique.append(content_Anchor_file[k][5])
+        end
+    end
+			
+    #write NREXTERNALNCELL  data for NR_NE_name
+    Print('\n')
+    Print('5G5G NR external cells for the NR Anchored site')
+    Print('List of '+str(len(Anchor_file_NR_external_cells_col5_unique))+' NR external cells to be added for '+NR_NE_name)
+    Print(Anchor_file_NR_external_cells_col5_unique)
+    WriteToAFile(path1,'// Number of NR externals: '+str(len(Anchor_file_NR_external_cells_col5_unique)))
+    WriteToAFile(path1,'// '+','.join(Anchor_file_NR_external_cells_col5_unique))
+    WriteToAFile(path1,'\n')
+    #ADD NREXTERNALNCELL:Mcc="262",Mnc="02",gNBId=1974,CellId=203,PhysicalCellId=846,Tac=43400,SsbDescMethod=SSB_DESC_TYPE_GSCN,SsbFreqPos=7832;
+
+    # bellow are tuple lists with nrcellname positions and nrcell name in the csv
+    Print('\n')
+    Print(' lists of tuples with external nrcellname positions from the CU,DU csv for Anchored NR site')
+    content_CU_file_nrcellname_position_list_2=csv_parser(content_CU_file,len_content_CU_file,Anchor_file_NR_external_cells_col5_unique,dict_choices_region[str(GetValue(hRadio1))])
+    Print(content_CU_file_nrcellname_position_list_2)
+    content_DU_file_nrcellname_position_list_2=csv_parser(content_DU_file,len_content_DU_file,Anchor_file_NR_external_cells_col5_unique,dict_choices_region[str(GetValue(hRadio1))])
+    Print(content_DU_file_nrcellname_position_list_2)
+
+
+    #each iteration of this for is for one NR external cell
+    for item in range(0,len(Anchor_file_NR_external_cells_col5_unique))
+        gnbId_2=content_CU_file[content_CU_file_nrcellname_position_list_2[item][0]][content_CU_file_nrcellname_position_list_2[item][1]-7]
+        GNBTAC_2=content_DU_file[content_DU_file_nrcellname_position_list_2[item][0]][content_DU_file_nrcellname_position_list_2[item][1]-9]
+        NR_PCI_2=content_DU_file[content_DU_file_nrcellname_position_list_2[item][0]][content_DU_file_nrcellname_position_list_2[item][1]-8]
+        #added 06Mar
+        NR_ARFCN_2=content_DU_file[content_DU_file_nrcellname_position_list_2[item][0]][content_DU_file_nrcellname_position_list_2[item][1]-4]
+        #Print(NR_ARFCN_2+"  "+Anchor_file_NR_external_cells_col5_unique[item]+" "+GNBTAC_2)
+        
+        if Anchor_file_NR_external_cells_col5_unique[item][1]=='R' and Anchor_file_NR_external_cells_col5_unique[item][6]=='A'
+            SSB_GSCN_2='7832'
+            CellId_2='201'
+        elif Anchor_file_NR_external_cells_col5_unique[item][1]=='R' and Anchor_file_NR_external_cells_col5_unique[item][6]=='B'
+            SSB_GSCN_2='7832'
+            CellId_2='202'
+        elif Anchor_file_NR_external_cells_col5_unique[item][1]=='R' and Anchor_file_NR_external_cells_col5_unique[item][6]=='C'
+            SSB_GSCN_2='7832'
+            CellId_2='203'
+        elif Anchor_file_NR_external_cells_col5_unique[item][1]=='R' and Anchor_file_NR_external_cells_col5_unique[item][6]=='D'
+            SSB_GSCN_2='7832'
+            CellId_2='204'
+        elif Anchor_file_NR_external_cells_col5_unique[item][1]=='P' and Anchor_file_NR_external_cells_col5_unique[item][6]=='A'
+            SSB_GSCN_2='1956'
+            CellId_2='211'
+        elif Anchor_file_NR_external_cells_col5_unique[item][1]=='P' and Anchor_file_NR_external_cells_col5_unique[item][6]=='B'
+            SSB_GSCN_2='1956'
+            CellId_2='212'
+        elif Anchor_file_NR_external_cells_col5_unique[item][1]=='P' and Anchor_file_NR_external_cells_col5_unique[item][6]=='C'
+            SSB_GSCN_2='1956'
+            CellId_2='213'
+        elif Anchor_file_NR_external_cells_col5_unique[item][1]=='P' and Anchor_file_NR_external_cells_col5_unique[item][6]=='D'
+            SSB_GSCN_2='1956'
+            CellId_2='214'
+        elif Anchor_file_NR_external_cells_col5_unique[item][1]=='K' and Anchor_file_NR_external_cells_col5_unique[item][6]=='A'  and NR_ARFCN_2 in ["4659","4692"]
+            SSB_GSCN_2=NR_ARFCN_2
+            CellId_2='221'
+        elif Anchor_file_NR_external_cells_col5_unique[item][1]=='K' and Anchor_file_NR_external_cells_col5_unique[item][6]=='B' and NR_ARFCN_2 in ["4659","4692"]
+            SSB_GSCN_2=NR_ARFCN_2
+            CellId_2='222'
+        elif Anchor_file_NR_external_cells_col5_unique[item][1]=='K' and Anchor_file_NR_external_cells_col5_unique[item][6]=='C' and NR_ARFCN_2 in ["4659","4692"]
+            SSB_GSCN_2=NR_ARFCN_2
+            CellId_2='223'
+        elif Anchor_file_NR_external_cells_col5_unique[item][1]=='K' and Anchor_file_NR_external_cells_col5_unique[item][6]=='D' and NR_ARFCN_2 in ["4659","4692"]
+            SSB_GSCN_2=NR_ARFCN_2
+            CellId_2='224'
+        else
+            DlArfcn='NOT DETERMINED'
+            CellId='NOT DETERMINED'
+        end
+        
+        #check if the NREXTERNALNCELL is already there
+        for ii in range(0, len(NREXTERNALNCELL_gnbID_list))
+            if NREXTERNALNCELL_gnbID_list[ii]==gnbId_2 and NREXTERNALNCELL_CellID_list[ii]==CellId_2
+                WriteToAFile(path2,'RMV NREXTERNALNCELL:GNBID='+gnbId_2+',CELLID='+CellId_2+';'+'{'+NR_NE_name+'}')
+            end
+        end
+        # WriteToAFile(path2,'\n')
+        
+        if gnbId_2=='NCI' 
+            WriteToAFile(path1,'//  No cell '+Anchor_file_NR_external_cells_col5_unique[item])
+            WriteToAFile(path4,'//  No cell '+Anchor_file_NR_external_cells_col5_unique[item])
+          
+
+        else
+            WriteToAFile(path1,'// Add external  '+Anchor_file_NR_external_cells_col5_unique[item])
+            WriteToAFile(path1,'ADD NREXTERNALNCELL:Mcc="262",Mnc="02",gNBId='+gnbId_2+',CellId='+CellId_2+',PhysicalCellId='+NR_PCI_2+',Tac='+GNBTAC_2+',SsbDescMethod=SSB_DESC_TYPE_GSCN,SsbFreqPos='+SSB_GSCN_2+';'+'{'+NR_NE_name+'}')
+            WriteToAFile(path4,'// Mod external  '+Anchor_file_NR_external_cells_col5_unique[item])
+            WriteToAFile(path4,'MOD NREXTERNALNCELL:Mcc="262",Mnc="02",gNBId='+gnbId_2+',CellId='+CellId_2+',PhysicalCellId='+NR_PCI_2+',Tac='+GNBTAC_2+',SsbDescMethod=SSB_DESC_TYPE_GSCN,SsbFreqPos='+SSB_GSCN_2+';'+'{'+NR_NE_name+'}')
+        end
+
+        # check if TDD for N relation objects
+        if Anchor_file_NR_external_cells_col5_unique[item][1] in ['K','P'] and GetValue(flag_onlytdd) ==True
+            comment_mml_line ='//'
+        else 
+            comment_mml_line =''
+        end
+
+        
+        # Adding/deleting the 5G5G relations on the Anchored site for each external cell, according to planning
+        #ADD NRCELLRELATION:NrCellId=222,Mcc="262",Mnc="02",gNBId=1802,CellId=201,CellIndividualOffset=dB0,NoRmvFlag=FORBID_ANR_RMV;
+        NRCELLRELATION_NR_locallcellID_planned_list=[]  #list will be constructed to retain the planned local cellID for which we will add 5G5G relation towards the peer NR external
+        for ii in range(0, len(Anchor_file_NR_external_cells_col5))
+            if Anchor_file_NR_external_cells_col5[ii]==Anchor_file_NR_external_cells_col5_unique[item] and gnbId_2!='NCI'
+                nrlocalcellId=nrcellname2localid(Anchor_file_NR_Anchored_Source_cells_col4[ii])
+                WriteToAFile(path1,comment_mml_line+'ADD NRCELLRELATION:NrCellId='+nrlocalcellId+',Mcc="262",Mnc="02",gNBId='+gnbId_2+',CellId='+CellId_2+',CellIndividualOffset=dB0,NoRmvFlag=FORBID_ANR_RMV;'+'{'+NR_NE_name+'}')
+                WriteToAFile(path4,comment_mml_line+'MOD NRCELLRELATION:NrCellId='+nrlocalcellId+',Mcc="262",Mnc="02",gNBId='+gnbId_2+',CellId='+CellId_2+',CellIndividualOffset=dB0,NoRmvFlag=FORBID_ANR_RMV;'+'{'+NR_NE_name+'}')
+
+                NRCELLRELATION_NR_locallcellID_planned_list.append(nrlocalcellId)
+            end
+        end
+
+        #remove already existing NRNRELATIONSHIP for the planned NR external on each local cell included in NRCELLRELATION_NR_locallcellID_planned_list
+        for iii in range(0,len(NRCELLRELATION_LocalcellID))
+            if NRCELLRELATION_gnbid[iii]==gnbId_2 and NRCELLRELATION_cellID[iii]==CellId_2 and NRCELLRELATION_LocalcellID[iii] in NRCELLRELATION_NR_locallcellID_planned_list
+                WriteToAFile(path2,'RMV NRCELLRELATION:NRCELLID='+NRCELLRELATION_LocalcellID[iii]+',GNBID='+NRCELLRELATION_gnbid[iii]+',CELLID='+NRCELLRELATION_cellID[iii]+';'+'{'+NR_NE_name+'}')
+            end
+        end
+        WriteToAFile(path2,'\n')
+        WriteToAFile(path1,'\n')
+        WriteToAFile(path4,'\n')
+
+    end
+
+else
+    # mailreport()
+    Print('Script generation stopped at NREXTERNALCELL')
+    end
+
+fisier=Open(path2,'r')
+reverse1=fisier.read().splitlines()
+correct1=reverse1[::-1]
+# Print(reverse1)
+# Print(correct1)
+for i in correct1
+    WriteToAFile(path3,i)
+    end
+
+fisier_=Open(path22,'r')
+reverse2=fisier_.read().splitlines()
+correct2=reverse2[::-1]
+# Print(reverse1)
+# Print(correct1)
+for i in correct2
+    WriteToAFile(path33,i)
+    end
+
+WriteToAFile(path1,'\n\n//MOD commands needed in case of duplicated object to be ADD\n')
+WriteToAFile(path11,'\n\n//MOD commands needed in case of duplicated object to be ADD\n')
+fisier__=Open(path4,'r')
+continut=fisier__.read().splitlines()
+for i in continut
+    WriteToAFile(path1,i)
+    end
+
+fisier___=Open(path44,'r')
+continut=fisier___.read().splitlines()
+for i in continut
+    WriteToAFile(path11,i)
+    end
+
+mailreport()
