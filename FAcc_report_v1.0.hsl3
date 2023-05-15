@@ -1,0 +1,796 @@
+# •	Site defined in MAE – OK
+# •	Cells deactivated(site is only RFS) – OK
+# •	Cells operative printout (attached) – OK
+# •	FAcc report: Handbuch Checkliste (attached) – OK
+# •	FAcc report: –Ticket linked with “BP Deployment” Ticket, “Integration Basestation Test” Ticket – OK
+# •	Project Number, Project ID, Pplus MN-ID - OK
+# •	Alarm logs attached before and after planned work – OK
+# •	Alarm check before and after planned work – OK
+# •	Latest Software version – OK
+# •	Test calls result (with attachment)- OK
+# •	BBU boards type (with attachment) - OK
+# •	RETs/TMA installed and configured – OK
+# •	VSWR test on cells – OK
+# •	Lifecyle of the cells changed in CPCM Database to “PRE-OPERATIVE”- OK
+
+
+#function definitions
+def WriteToAFile(f, string) 
+    if (IsFile(f)==False)
+        fp1 = Open(f,'a+')
+        #Print(f + ' file has been created!')
+        fp1.close()
+    end  
+    fp = Open(f, "a+")
+    fp.write(string)
+    fp.close()
+end
+def  com(comm,objIndex,col_name1,col_name2,*args)
+        SendMML(comm)
+        rpt=GetMMLReport(-1)
+        p=ParseMMLRpt(rpt)
+        col1=GetColumnByName(p, objIndex, col_name1, 0)
+        col2=GetColumnByName(p, objIndex, col_name2, 0)
+        other_columns_list=[GetColumnByName(p, objIndex, col, 0) for col in args]
+        return col1, col2, other_columns_list
+end
+def facc_4g(ne_name,scenario)
+    output=''
+    Output=''
+    # scenario=''
+    flag=0
+    Cells_STATE_list=[]
+    #test connection
+    if ConnectNE(ne_name)
+        flag=1
+        output+='•	Site defined in MAE – OK\n'
+    elif ConnectNE(ne_name[0]+'B1'+ne_name[3::])
+        flag=1
+        output+='•	Site defined in MAE – OK\n'
+    else    
+        Print('Recheck server or NE Name')
+        flag=0
+    end
+    if flag==1
+        com_dspcell=com('DSP CELL:;',0,'Local Cell ID','Cell Name','Cell instance state')
+        com_lstcell=com('LST CELL:;',0,'Local Cell ID','Cell active state','Cell admin state','Cell transmission and reception mode')
+        Cell_LocalId_list=com_lstcell[0]
+        # Print(Cell_LocalId_list)
+        Cell_Name_list=com_dspcell[1]
+        Cell_InstanceState_list=com_dspcell[2][0]
+        Cell_AdminState_list=com_lstcell[2][0]
+        Cell_ActiveState_list=com_lstcell[1]
+        Cell_txrxmode_list=com_lstcell[2][1]
+        Cell_1800_4t4t_list=[]
+        Cell_2600_4t4t_list=[]
+        
+        for i in range(0,len(Cell_LocalId_list))
+            Cells_STATE_list.append([Cell_LocalId_list[i],Cell_ActiveState_list[i]])
+            end
+        for i in range(0,len(Cell_LocalId_list))
+            if Cell_LocalId_list[i] in ['7','8','9'] and '4R' in Cell_txrxmode_list[i]
+                Cell_1800_4t4t_list.append(Cell_LocalId_list[i])
+                end
+            end
+        for i in range(0,len(Cell_LocalId_list))
+            if Cell_LocalId_list[i] in ['4','5','6'] and '4R' in Cell_txrxmode_list[i]
+                Cell_2600_4t4t_list.append(Cell_LocalId_list[i])
+                end
+            end
+
+        
+        if (scenario=='L7' and ['30','Deactivated'] in Cells_STATE_list and ['31','Deactivated'] in Cells_STATE_list and ['32','Deactivated'] in Cells_STATE_list) or \
+            (scenario=='L7' and ['30','Deactivated'] in Cells_STATE_list and ['31','Deactivated'] in Cells_STATE_list and '32' not in Cell_LocalId_list) or \
+            (scenario=='L7' and ['30','Deactivated'] in Cells_STATE_list and '31' not in Cell_LocalId_list and '32' not in Cell_LocalId_list)
+            output+='•	Cells deactivated(site is only RFS) – OK\n'
+            Output=ne_name+' FAcc report: LTE 700  \n'
+
+        elif (scenario=='L8' and ['0','Deactivated'] in Cells_STATE_list and ['1','Deactivated'] in Cells_STATE_list and ['2','Deactivated'] in Cells_STATE_list) or \
+            (scenario=='L8' and ['0','Deactivated'] in Cells_STATE_list and ['1','Deactivated'] in Cells_STATE_list and '2' not in Cell_LocalId_list) or \
+            (scenario=='L8' and ['0','Deactivated'] in Cells_STATE_list and '1' not in Cell_LocalId_list and '2' not in Cell_LocalId_list)
+            output+='•	Cells deactivated(site is only RFS) – OK\n'
+            #### also for NBIot!!!!!!
+            Output=ne_name+' FAcc report: LTE 800  \n'
+
+        elif (scenario=='L9' and ['24','Deactivated'] in Cells_STATE_list and ['25','Deactivated'] in Cells_STATE_list and ['26','Deactivated'] in Cells_STATE_list) or \
+            (scenario=='L9' and ['24','Deactivated'] in Cells_STATE_list and ['25','Deactivated'] in Cells_STATE_list and '26' not in Cell_LocalId_list) or \
+            (scenario=='L9' and ['24','Deactivated'] in Cells_STATE_list and '25' not in Cell_LocalId_list and '26' not in Cell_LocalId_list)
+            output+='•	Cells deactivated(site is only RFS) – OK\n'
+            Output=ne_name+' FAcc report: LTE 900  \n'
+
+        elif (scenario=='L21' and ['18','Deactivated'] in Cells_STATE_list and ['19','Deactivated'] in Cells_STATE_list and ['20','Deactivated'] in Cells_STATE_list) or \
+            (scenario=='L21' and ['18','Deactivated'] in Cells_STATE_list and ['19','Deactivated'] in Cells_STATE_list and '20' not in Cell_LocalId_list) or \
+            (scenario=='L21' and ['18','Deactivated'] in Cells_STATE_list and '19' not in Cell_LocalId_list and '20' not in Cell_LocalId_list)
+            output+='•	Cells deactivated(site is only RFS) – OK\n'
+            Output=ne_name+' FAcc report: LTE 2100  \n'
+
+        elif (scenario=='L18' and ['7','Deactivated'] in Cells_STATE_list and ['8','Deactivated'] in Cells_STATE_list and ['9','Deactivated'] in Cells_STATE_list) or \
+            (scenario=='L18' and ['7','Deactivated'] in Cells_STATE_list and ['8','Deactivated'] in Cells_STATE_list and '9' not in Cell_LocalId_list) or \
+            (scenario=='L18' and ['7','Deactivated'] in Cells_STATE_list and '8' not in Cell_LocalId_list and '9' not in Cell_LocalId_list)
+            output+='•	Cells deactivated(site is only RFS) – OK\n'
+            Output=ne_name+' FAcc report: LTE 1800  \n'
+
+        elif (scenario=='L26' and ['4','Deactivated'] in Cells_STATE_list and ['5','Deactivated'] in Cells_STATE_list and ['6','Deactivated'] in Cells_STATE_list) or \
+            (scenario=='L26' and ['4','Deactivated'] in Cells_STATE_list and ['5','Deactivated'] in Cells_STATE_list and '6' not in Cell_LocalId_list) or \
+            (scenario=='L26' and ['4','Deactivated'] in Cells_STATE_list and '5' not in Cell_LocalId_list and '6' not in Cell_LocalId_list)
+            output+='•	Cells deactivated(site is only RFS) – OK\n'
+            Output=ne_name+' FAcc report: LTE 2600  \n'
+        else
+            output+='•	Cells deactivated(site is only RFS) – <<Check manually!>>\n'
+            Output=ne_name+' FAcc report \n'
+            end
+
+        output+='\n•	Cells operative printout (attached) – \n'+'•	Checklist (attached) – \n'+'•	FAcc ticket linked with BP Deployment, Integration Basestation Test tickets – \n'+'•	Project Number, Project ID, Pplus MN-ID - \n'+'•	Alarm logs before and after planned work (attached) – \n'
+        output+='\n•	Alarm check before and after planned work – '
+        
+        @LST ALMAF:;
+        Alarm_Report=GetMMLReport(-1)
+        # Print(Alarm_Report)
+        p = ParseAlmRpt(Alarm_Report)
+        Alm_Number=GetAlmRptNum(p)
+        # Print(Alm_Number)
+        cnt=0
+        cnt1=0
+        if Alm_Number==0
+            output+='OK\n'
+            end
+        if Alm_Number!=0
+            for i in range(0,Alm_Number) 
+                almName = GetAlmName(p, i)
+                locInfo = GetAlmLocationInfo(p, i)
+                alarmtype = GetAlmType(p, i)
+                alarm_sort = GetAlmSort(p, i)
+                rtime = GetAlmRaiseTime(p, i)
+                # Print(almName+'  '+alarm_sort+'  '+locInfo+'  '+rtime)
+                if alarm_sort in ['Signaling','Trunk']
+                    if 'X2' in locInfo or 'MERGED_PEER' in locInfo or 'Neighboring Base Station' in locInfo or 'Xn' in locInfo
+                        output+=''
+                        cnt+=1
+                    elif 'S1' in locInfo
+                        output+='\n		'+almName+'  ' +'  <<check for S1 alm!>>'
+                    else
+                        output+='\n		'+almName+'  ' +'  <<Not Deployment alm. To be checked!>>'
+                    end
+                elif alarm_sort in ['Hardware','Environment','Communication','Running']
+                    cnt1+=1
+                    if scenario=='L7' and ('Slot No.=7' in locInfo  or 'Slot No.=4' in locInfo or 'Slot No.=5' in locInfo or 'Subrack No.=8' in locInfo or 'Subrack No.=9' in locInfo)
+                        output+='\n		'+almName+'  '+rtime[0:16]+'  <<check for Deployment alm!>>'
+                    elif scenario=='L8' and ('Slot No.=7' in locInfo  or 'Slot No.=4' in locInfo  or 'Subrack No.=8' in locInfo or 'Subrack No.=6' in locInfo)
+                        output+='\n		'+almName+'  '+rtime[0:16]+'  <<check for Deployment alm!>>'
+                    elif scenario=='L9' and ('Slot No.=7' in locInfo  or 'Slot No.=4' in locInfo or 'Subrack No.=8' in locInfo)
+                        output+='\n		'+almName+'  '+rtime[0:16]+'  <<check for Deployment alm!>>'
+                    elif scenario=='18' and ('Slot No.=7' in locInfo  or 'Slot No.=3' in locInfo or 'Subrack No.=6' in locInfo or 'Subrack No.=10' in locInfo)
+                        output+='\n		'+almName+'  '+rtime[0:16]+'  <<check for Deployment alm!>>'
+                    elif scenario=='L21' and ('Slot No.=7' in locInfo  or 'Slot No.=3' in locInfo  or 'Subrack No.=10' in locInfo )
+                        output+='\n		'+almName+'  '+rtime[0:16]+'  <<check for Deployment alm!>>'
+                    elif scenario=='L26' and ('Slot No.=7' in locInfo  or 'Slot No.=5' in locInfo or 'Slot No.=2' in locInfo or 'Subrack No.=6' in locInfo)
+                        output+='\n		'+almName+'  '+rtime[0:16]+'  <<check for Deployment alm!>>'
+                    elif 'Slot No.=18' in locInfo or 'Slot No.=19' in locInfo
+                        output+='\n		'+almName+'  '+rtime[0:16]+'  <<check for External alm!>>'
+                    elif 'Server' in locInfo or 'Clock' in locInfo
+                        output+='\n		'+almName+'  '+rtime[0:16]+'  <<check for Clock alm!>>'
+                    else 
+                    output+='\n		'+almName+'  '+rtime[0:16]+'  <<check the alm!>>'
+                    end
+                end
+                
+            end
+            if cnt>0 and cnt1>0
+                output+=''
+            end
+            if cnt>0 and cnt1==0
+                output+='OK'
+            end
+        end
+
+        com_lstsoftware=com('LST SOFTWARE:;',0,'Storage Area','Application Type','Software Version','Software Status')
+        for i in range(0,len(com_lstsoftware[0]))
+            if com_lstsoftware[0][i]=='Main Area' and com_lstsoftware[1][i]=='eNodeB' and com_lstsoftware[2][0][i]=='BTS3900_5900 V100R018C10SPC160' and com_lstsoftware[2][1][i]=='Available'
+                output+='\n•	Latest Software version – '+com_lstsoftware[2][0][i][13::]+'  <<compare with checklist>>'+'\n'
+            end
+
+        end
+        
+
+        output+='•	BBU boards type - '
+
+        com_DspBrd=com('DSP BRD:;',0,'Cabinet No.','Subrack No.','Slot No.','Operational State')
+        Cab_brd_list=com_DspBrd[0]
+        Subrack_brd_lst=com_DspBrd[1]
+        Slot_brd_lst=com_DspBrd[2][0]
+        Operational_State_brd_lst=com_DspBrd[2][1]
+        for i in range(0,len(Cab_brd_list))
+            if Slot_brd_lst[i]=='2' and Operational_State_brd_lst[i]=='Enabled' and scenario not in ['L18','L21','L7']
+                    com_brdmfrinfo_2=com('DSP BRDMFRINFO:CN='+Cab_brd_list[i]+',SRN='+Subrack_brd_lst[i]+',SN='+Slot_brd_lst[i]+';',0,'Type','Description')
+                    output+='2:'+com_brdmfrinfo_2[0][0][4::]+', '
+                end
+            if Slot_brd_lst[i]=='3' and Operational_State_brd_lst[i]=='Enabled' and scenario not in ['L8','L7','L9','L26']
+                com_brdmfrinfo_3=com('DSP BRDMFRINFO:CN='+Cab_brd_list[i]+',SRN='+Subrack_brd_lst[i]+',SN='+Slot_brd_lst[i]+';',0,'Type','Description')
+                output+='3:'+com_brdmfrinfo_3[0][0][4::]+', '
+            end
+            if Slot_brd_lst[i]=='4' and Operational_State_brd_lst[i]=='Enabled' and scenario not in ['L18','L21','L26']
+                com_brdmfrinfo_4=com('DSP BRDMFRINFO:CN='+Cab_brd_list[i]+',SRN='+Subrack_brd_lst[i]+',SN='+Slot_brd_lst[i]+';',0,'Type','Description')
+                output+='4:'+com_brdmfrinfo_4[0][0][4::]+', '
+            end
+            if Slot_brd_lst[i]=='5' and Operational_State_brd_lst[i]=='Enabled' and scenario not in ['L18','L21','L8','L9']
+                com_brdmfrinfo_5=com('DSP BRDMFRINFO:CN='+Cab_brd_list[i]+',SRN='+Subrack_brd_lst[i]+',SN='+Slot_brd_lst[i]+';',0,'Type','Description')
+                output+='5:'+com_brdmfrinfo_5[0][0][4::]+', '
+            end
+            if Slot_brd_lst[i]=='7' and Operational_State_brd_lst[i]=='Enabled' 
+                com_brdmfrinfo_7=com('DSP BRDMFRINFO:CN='+Cab_brd_list[i]+',SRN='+Subrack_brd_lst[i]+',SN='+Slot_brd_lst[i]+';',0,'Type','Description')
+                output+='7:'+com_brdmfrinfo_7[0][0][4::]+', '
+            end
+            
+            if scenario=='L7' and Subrack_brd_lst[i] in ['80','82','84','86'] and '90' not in Subrack_brd_lst
+                com_brdmfrinfo_RRU=com('DSP BRDMFRINFO:CN='+Cab_brd_list[i]+',SRN='+Subrack_brd_lst[i]+',SN='+Slot_brd_lst[i]+';',0,'Type','Description')
+                output+=Subrack_brd_lst[i]+':'+com_brdmfrinfo_RRU[1][0][0:9]+', '
+                Output='FAcc report: LTE 700  \n'
+            elif scenario=='L7' and Subrack_brd_lst[i] in ['90','91','92']
+                com_brdmfrinfo_RRU=com('DSP BRDMFRINFO:CN='+Cab_brd_list[i]+',SRN='+Subrack_brd_lst[i]+',SN='+Slot_brd_lst[i]+';',0,'Type','Description')
+                output+=Subrack_brd_lst[i]+':'+com_brdmfrinfo_RRU[1][0][0:7]+', '
+                Output='FAcc report: LTE 700  \n'
+            elif scenario=='L8' and Subrack_brd_lst[i] in ['80','82','84','86'] and '60' not in Subrack_brd_lst
+                com_brdmfrinfo_RRU=com('DSP BRDMFRINFO:CN='+Cab_brd_list[i]+',SRN='+Subrack_brd_lst[i]+',SN='+Slot_brd_lst[i]+';',0,'Type','Description')
+                output+=Subrack_brd_lst[i]+':'+com_brdmfrinfo_RRU[1][0][0:9]+', '
+                Output='FAcc report: LTE 800  \n'
+            elif scenario=='L8' and Subrack_brd_lst[i] in ['60','61','62','63']
+                com_brdmfrinfo_RRU=com('DSP BRDMFRINFO:CN='+Cab_brd_list[i]+',SRN='+Subrack_brd_lst[i]+',SN='+Slot_brd_lst[i]+';',0,'Type','Description')
+                output+=Subrack_brd_lst[i]+':'+com_brdmfrinfo_RRU[1][0][0:7]+', '
+                Output='FAcc report: LTE 800  \n'
+            elif scenario=='L9' and Subrack_brd_lst[i] in ['80','82','84','86']
+                com_brdmfrinfo_RRU=com('DSP BRDMFRINFO:CN='+Cab_brd_list[i]+',SRN='+Subrack_brd_lst[i]+',SN='+Slot_brd_lst[i]+';',0,'Type','Description')
+                output+=Subrack_brd_lst[i]+':'+com_brdmfrinfo_RRU[1][0][0:9]+', '
+                Output='FAcc report: LTE 900  \n'
+            elif scenario=='L18' and Subrack_brd_lst[i] in ['67','68','69']
+                com_brdmfrinfo_RRU=com('DSP BRDMFRINFO:CN='+Cab_brd_list[i]+',SRN='+Subrack_brd_lst[i]+',SN='+Slot_brd_lst[i]+';',0,'Type','Description')
+                output+=Subrack_brd_lst[i]+':'+com_brdmfrinfo_RRU[1][0][0:7]+', '
+                Output='FAcc report: LTE 1800  \n'
+            elif scenario=='L18' and Subrack_brd_lst[i] in ['100','101','102','103'] and '67' not in Subrack_brd_lst
+                com_brdmfrinfo_RRU=com('DSP BRDMFRINFO:CN='+Cab_brd_list[i]+',SRN='+Subrack_brd_lst[i]+',SN='+Slot_brd_lst[i]+';',0,'Type','Description')
+                output+=Subrack_brd_lst[i]+':'+com_brdmfrinfo_RRU[1][0][0:7]+', '
+                Output='FAcc report: LTE 1800  \n'
+            elif scenario=='L21' and Subrack_brd_lst[i] in ['100','101','102','103']
+                com_brdmfrinfo_RRU=com('DSP BRDMFRINFO:CN='+Cab_brd_list[i]+',SRN='+Subrack_brd_lst[i]+',SN='+Slot_brd_lst[i]+';',0,'Type','Description')
+                output+=Subrack_brd_lst[i]+':'+com_brdmfrinfo_RRU[1][0][0:7]+', '
+                Output='FAcc report: LTE 2100  \n'
+            elif scenario=='L26' and Subrack_brd_lst[i] in ['64','65','66']
+                com_brdmfrinfo_RRU=com('DSP BRDMFRINFO:CN='+Cab_brd_list[i]+',SRN='+Subrack_brd_lst[i]+',SN='+Slot_brd_lst[i]+';',0,'Type','Description')
+                output+=Subrack_brd_lst[i]+':'+com_brdmfrinfo_RRU[1][0][0:7]+', '
+                Output='FAcc report: LTE 2600  \n'
+
+            end
+        end
+        output+='  <<compare with checklist>>'
+        
+        output+='\n•	RETs installed and configured – '
+        """"""
+        com_DSPRET=com('DSP RET:;',0,'Device No.','Device Name')
+        com_DSPRETSUBUNIT=com('DSP RETSUBUNIT:;',0,'Device No.','Device Name','Subunit Name','Online Status')
+        Dspret_deviceno_list=com_DSPRET[0]
+        # Print(Dspret_deviceno_list)
+        Dspret_devicename_list=com_DSPRET[1]
+        # Print(Dspret_devicename_list)
+        Dspretsubunit_deviceno_list=com_DSPRETSUBUNIT[0]
+        # Print(Dspretsubunit_deviceno_list)
+        Dspretsubunit_devicename_list=com_DSPRETSUBUNIT[1]
+        # Print(Dspretsubunit_devicename_list)
+        Dspretsubunit_subunitname_list=com_DSPRETSUBUNIT[2][0]
+        # Print(Dspretsubunit_subunitname_list)
+        Dspretsubunit_onlinestatus_list=com_DSPRETSUBUNIT[2][1]
+        # Print(Dspretsubunit_onlinestatus_list)
+        RET700_list=[]
+        flagret700=1
+        RET800_list=[]
+        flagret800=1
+        RET900_list=[]
+        flagret900=1
+        RET1800_list=[]
+        RET1800_list_2nd=[]
+        flagret1800=1
+        RET2100_list_new=[]
+        RET2100_list_legacy=[]
+        RET2100_list_only1800ret=[]
+        flagret2100=1
+        RET2600_list=[]
+        RET2600_list_2nd=[]
+        flagret2600=1
+
+        for i in range(0,len(Dspret_deviceno_list))
+            if scenario=='L7' and  '30' in Cell_LocalId_list
+                if Dspret_deviceno_list[i]=='30' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S30' and Dspretsubunit_subunitname_list[i]==ne_name[0]+'PL'+ne_name[3::]+'A' and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE'
+                    RET700_list.append('1')
+                    end
+                    end
+            if scenario=='L7' and  '31' in Cell_LocalId_list
+                if Dspret_deviceno_list[i]=='31' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S31' and Dspretsubunit_subunitname_list[i]==ne_name[0]+'PL'+ne_name[3::]+'B' and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE'
+                    RET700_list.append('1')
+                    end
+                    end
+            if scenario=='L7' and  '32' in Cell_LocalId_list
+                if Dspret_deviceno_list[i]=='32' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S32' and Dspretsubunit_subunitname_list[i]==ne_name[0]+'PL'+ne_name[3::]+'C' and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE'
+                    RET700_list.append('1')
+                    end
+                    end
+        end
+        if scenario=='L7' and '30' in Cell_LocalId_list and '31' in Cell_LocalId_list and '32' in Cell_LocalId_list and len(RET700_list)==3
+                output+='OK\n'
+        elif scenario=='L7' and '30' in Cell_LocalId_list and '31' in Cell_LocalId_list and '32' not in Cell_LocalId_list and len(RET700_list)==2
+            output+='OK\n'
+        elif scenario=='L7' and '30' in Cell_LocalId_list and '31' not in Cell_LocalId_list and '32' not in Cell_LocalId_list and len(RET700_list)==1
+            output+='OK\n'
+        else
+            if scenario=='L7' 
+                flagret700=0
+            end
+        end
+        if scenario=='L7' and flagret700==0
+            output+='<<Check manually!>>\n'
+        end
+        
+        for i in range(0,len(Dspret_deviceno_list))
+            if scenario=='L8' and  '0' in Cell_LocalId_list
+                if Dspret_deviceno_list[i]=='0' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S0' and Dspretsubunit_subunitname_list[i]==ne_name[0]+'XL'+ne_name[3::]+'A' and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE'
+                    RET800_list.append('1')
+                    end
+                    end
+            if scenario=='L8' and  '1' in Cell_LocalId_list
+                if Dspret_deviceno_list[i]=='1' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S1' and Dspretsubunit_subunitname_list[i]==ne_name[0]+'XL'+ne_name[3::]+'B' and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE'
+                    RET800_list.append('1')
+                    end
+                    end
+            if scenario=='L8' and  '2' in Cell_LocalId_list
+                if Dspret_deviceno_list[i]=='2' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S2' and Dspretsubunit_subunitname_list[i]==ne_name[0]+'XL'+ne_name[3::]+'C' and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE'
+                    RET800_list.append('1')
+                    end
+                    end
+        end
+        if scenario=='L8' and '0' in Cell_LocalId_list and '1' in Cell_LocalId_list and '2' in Cell_LocalId_list and len(RET800_list)==3
+            output+='OK\n'
+        elif scenario=='L8' and '0' in Cell_LocalId_list and '1' in Cell_LocalId_list and '2' not in Cell_LocalId_list and len(RET800_list)==2
+            output+='OK\n'
+        elif scenario=='L8' and '0' in Cell_LocalId_list and '1' not in Cell_LocalId_list and '2' not in Cell_LocalId_list and len(RET800_list)==1
+            output+='OK\n'
+        else
+            if scenario=='L8'
+                flagret800=0
+            end
+        end
+        if scenario=='L8' and flagret800==0
+            output+='<<Check manually!>>\n'
+        end
+        for i in range(0,len(Dspret_deviceno_list))
+            if scenario=='L9' and  '24' in Cell_LocalId_list and '60' not in Subrack_brd_lst
+                if Dspret_deviceno_list[i]=='30' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S30'  and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE' or \
+                Dspret_deviceno_list[i]=='0' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S0'  and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE'
+                    RET900_list.append('1')
+                    end
+                    end
+            if scenario=='L9' and  '25' in Cell_LocalId_list and '61' not in Subrack_brd_lst
+                if Dspret_deviceno_list[i]=='31' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S31'  and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE' or \
+                    Dspret_deviceno_list[i]=='1' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S1'  and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE'
+                    RET900_list.append('1')
+                    end
+                    end
+            if scenario=='L9' and  '26' in Cell_LocalId_list and '62' not in Subrack_brd_lst
+                if Dspret_deviceno_list[i]=='32' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S32'  and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE' or \
+                    Dspret_deviceno_list[i]=='2' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S2'  and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE'
+                    RET900_list.append('1')
+                    end
+                    end
+        end
+        if scenario=='L9' and '24' in Cell_LocalId_list and '25' in Cell_LocalId_list and '26' in Cell_LocalId_list and len(RET900_list)==3
+                output+='OK\n'
+        elif scenario=='L9' and '24' in Cell_LocalId_list and '25' in Cell_LocalId_list and '26' not in Cell_LocalId_list and len(RET900_list)==2
+            output+='OK\n'
+        elif scenario=='L9' and '24' in Cell_LocalId_list and '25' not in Cell_LocalId_list and '26' not in Cell_LocalId_list and len(RET900_list)==1
+            output+='OK\n'
+        else
+            if scenario=='L9'
+                flagret900=0
+            end
+        end
+        if scenario=='L9' and flagret900==0
+            output+='<<Check manually!>>\n'
+        end
+
+
+        for i in range(0,len(Dspret_deviceno_list))
+            if scenario=='L18' and  '7' in Cell_LocalId_list
+                if Dspret_deviceno_list[i]=='7' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S7' and Dspretsubunit_subunitname_list[i]==ne_name[0]+'XL'+ne_name[3::]+'H' and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE'
+                    RET1800_list.append('1')
+                    end
+                if Dspret_deviceno_list[i]=='17' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S17' and Dspretsubunit_subunitname_list[i]==ne_name[3::]+'H' and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE'
+                    RET1800_list_2nd.append('1')
+                    end
+            end
+            if scenario=='L18' and  '8' in Cell_LocalId_list
+                if Dspret_deviceno_list[i]=='8' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S8' and Dspretsubunit_subunitname_list[i]==ne_name[0]+'XL'+ne_name[3::]+'I' and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE'
+                    RET1800_list.append('1')
+                    end
+                if Dspret_deviceno_list[i]=='18' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S18' and Dspretsubunit_subunitname_list[i]==ne_name[3::]+'I' and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE'
+                    RET1800_list_2nd.append('1')
+                    end
+            end
+            if scenario=='L18' and  '9' in Cell_LocalId_list
+                if Dspret_deviceno_list[i]=='9' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S9' and Dspretsubunit_subunitname_list[i]==ne_name[0]+'XL'+ne_name[3::]+'K' and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE'
+                    RET1800_list.append('1')
+                    end
+                if Dspret_deviceno_list[i]=='19' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S19' and Dspretsubunit_subunitname_list[i]==ne_name[3::]+'K' and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE'
+                    RET1800_list_2nd.append('1')
+                    end
+            end
+        end
+        if scenario=='L18' and '7' in Cell_LocalId_list and '8' in Cell_LocalId_list and '9' in Cell_LocalId_list and len(RET1800_list)==3 and len(RET1800_list_2nd)==3
+            output+='OK\n'
+        elif scenario=='L18' and '7' in Cell_LocalId_list and '8' in Cell_LocalId_list and '9' in Cell_LocalId_list and len(RET1800_list)==3 and len(RET1800_list_2nd)==0 and len(Cell_1800_4t4t_list)==0
+            output+='OK\n'
+        elif scenario=='L18' and '7' in Cell_LocalId_list and '8' in Cell_LocalId_list and '9' in Cell_LocalId_list and len(RET1800_list)==3 and len(RET1800_list_2nd)!=3 and len(Cell_1800_4t4t_list)==3
+              output+='OK, check 2nd ret 1800\n'  
+        
+        elif scenario=='L18' and '7' in Cell_LocalId_list and '8' in Cell_LocalId_list and '9' not in Cell_LocalId_list and len(RET1800_list)==2 and len(RET1800_list_2nd)==2
+            output+='OK\n'
+        elif scenario=='L18' and '7' in Cell_LocalId_list and '8' in Cell_LocalId_list and '9' not in Cell_LocalId_list and len(RET1800_list)==2 and len(RET1800_list_2nd)==0 and len(Cell_1800_4t4t_list)==0
+            output+='OK\n'
+        elif scenario=='L18' and '7' in Cell_LocalId_list and '8' in Cell_LocalId_list and '9' not in Cell_LocalId_list and len(RET1800_list)==2 and len(RET1800_list_2nd)!=2 and len(Cell_1800_4t4t_list)==2
+            output+='OK, check 2nd ret 1800\n'
+
+        elif scenario=='L18' and '7' in Cell_LocalId_list and '8' not in Cell_LocalId_list and '9' not in Cell_LocalId_list and len(RET1800_list)==1 and len(RET1800_list_2nd)==1
+            output+='OK\n'
+        elif scenario=='L18' and '7' in Cell_LocalId_list and '8' not in Cell_LocalId_list and '9' not in Cell_LocalId_list and len(RET1800_list)==1 and len(RET1800_list_2nd)==0 and len(Cell_1800_4t4t_list)==0
+            output+='OK\n'
+        elif scenario=='L18' and '7' in Cell_LocalId_list and '8' not in Cell_LocalId_list and '9' not in Cell_LocalId_list and len(RET1800_list)==1 and len(RET1800_list_2nd)!=1 and len(Cell_1800_4t4t_list)==1
+            output+='OK, check 2nd ret 1800\n'
+        else
+            if scenario=='L18' 
+                flagret1800=0
+            end
+        end
+        if scenario=='L18' and flagret1800==0
+            output+='<<Check manually!>>\n'
+        end
+
+        Com_lstsectoreqm=com('LST SECTOREQM:;',1,'Subrack No.','Antenna Channel No.')
+        Subrack_sectoreqm_list=Com_lstsectoreqm[0]
+        AntennaChanNo_sectoreqm_list=Com_lstsectoreqm[1]
+        AntennaChanNo_sectoreqm_list_2100=[]
+        flag2100_ret_feeder=''
+
+        for i in range(0,len(Subrack_sectoreqm_list))
+            if Subrack_sectoreqm_list[i] in ['100','101','102','103']
+                AntennaChanNo_sectoreqm_list_2100.append(AntennaChanNo_sectoreqm_list[i])  #construct 2100 antenna port list
+            end
+        end
+        if 'R0A' in AntennaChanNo_sectoreqm_list_2100 and 'R0C' in AntennaChanNo_sectoreqm_list_2100 and 'R0B' not in AntennaChanNo_sectoreqm_list_2100 and 'R0D' not in AntennaChanNo_sectoreqm_list_2100
+            flag2100_ret_feeder='AC'
+        elif 'R0B' in AntennaChanNo_sectoreqm_list_2100 and 'R0D' in AntennaChanNo_sectoreqm_list_2100 and 'R0A' not in AntennaChanNo_sectoreqm_list_2100 and 'R0C' not in AntennaChanNo_sectoreqm_list_2100
+            flag2100_ret_feeder='BD'
+        elif 'R0A' in AntennaChanNo_sectoreqm_list_2100 and 'R0C' in AntennaChanNo_sectoreqm_list_2100 and 'R0B'  in AntennaChanNo_sectoreqm_list_2100 and 'R0D'  in AntennaChanNo_sectoreqm_list_2100
+            flag2100_ret_feeder='not sure'
+        end
+        # Print(flag2100_ret_feeder)
+        # Print(AntennaChanNo_sectoreqm_list_2100)
+
+
+        for i in range(0,len(Dspret_deviceno_list))
+            if scenario=='L21' and  '18' in Cell_LocalId_list
+
+                if Dspret_deviceno_list[i]=='17' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S17' and Dspretsubunit_subunitname_list[i]==ne_name[3::]+'H' and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE'
+                    RET2100_list_new.append('1')
+                    end
+                if Dspret_deviceno_list[i]=='20' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S20' and Dspretsubunit_subunitname_list[i]==ne_name[0]+'XL'+ne_name[3::]+'T' and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE'
+                    RET2100_list_legacy.append('1')
+                    end
+                if Dspret_deviceno_list[i]=='7' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S7' and Dspretsubunit_subunitname_list[i]==ne_name[0]+'XL'+ne_name[3::]+'H' and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE' and flag2100_ret_feeder in ['AC','BD']
+                    RET2100_list_only1800ret.append('1')
+                    end
+            end
+            if scenario=='L21' and  '19' in Cell_LocalId_list
+
+                if Dspret_deviceno_list[i]=='18' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S18' and Dspretsubunit_subunitname_list[i]==ne_name[3::]+'I' and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE'
+                    RET2100_list_new.append('1')
+                    end
+                if Dspret_deviceno_list[i]=='21' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S21' and Dspretsubunit_subunitname_list[i]==ne_name[0]+'XL'+ne_name[3::]+'U' and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE'
+                    RET2100_list_legacy.append('1')
+                    end
+                if Dspret_deviceno_list[i]=='8' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S8' and Dspretsubunit_subunitname_list[i]==ne_name[0]+'XL'+ ne_name[3::]+'I' and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE' and flag2100_ret_feeder in ['AC','BD']
+                    RET2100_list_only1800ret.append('1')
+                    end
+            end
+            if scenario=='L21' and  '20' in Cell_LocalId_list
+
+                if Dspret_deviceno_list[i]=='19' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S19' and Dspretsubunit_subunitname_list[i]==ne_name[3::]+'K' and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE'
+                    RET2100_list_new.append('1')
+                    end
+                if Dspret_deviceno_list[i]=='22' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S22' and Dspretsubunit_subunitname_list[i]==ne_name[0]+'XL'+ne_name[3::]+'V' and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE'
+                    RET2100_list_legacy.append('1')
+                    end
+                if Dspret_deviceno_list[i]=='9' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S9' and Dspretsubunit_subunitname_list[i]==ne_name[0]+'XL'+ne_name[3::]+'K' and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE' and flag2100_ret_feeder in ['AC','BD']
+                    RET2100_list_only1800ret.append('1')
+                    end
+            end
+        end
+        # Print(RET2100_list_new)
+        # Print(RET2100_list_legacy)
+        # Print(RET2100_list_only1800ret)
+        if scenario=='L21' and '18' in Cell_LocalId_list and '19' in Cell_LocalId_list and '20' in Cell_LocalId_list and len(RET2100_list_new)==3 and len(RET2100_list_legacy)==0
+            output+='OK\n'
+        elif scenario=='L21' and '18' in Cell_LocalId_list and '19' in Cell_LocalId_list and '20' in Cell_LocalId_list and len(RET2100_list_new)==0 and len(RET2100_list_legacy)==3
+            output+='OK\n'
+        elif scenario=='L21' and '18' in Cell_LocalId_list and '19' in Cell_LocalId_list and '20' in Cell_LocalId_list and len(RET2100_list_new)==0 and len(RET2100_list_legacy)==0 and len(RET2100_list_only1800ret)==3
+            output+='OK\n'
+        elif scenario=='L21' and '18' in Cell_LocalId_list and '19' in Cell_LocalId_list and '20' not in Cell_LocalId_list and len(RET2100_list_new)==2 and len(RET2100_list_legacy)==0
+            output+='OK\n'
+        elif scenario=='L21' and '18' in Cell_LocalId_list and '19' in Cell_LocalId_list and '20' not in Cell_LocalId_list and len(RET2100_list_new)==0 and len(RET2100_list_legacy)==2
+            output+='OK\n'
+        elif scenario=='L21' and '18' in Cell_LocalId_list and '19' in Cell_LocalId_list and '20' not in Cell_LocalId_list and len(RET2100_list_new)==0 and len(RET2100_list_legacy)==0 and len(RET2100_list_only1800ret)==2
+            output+='OK\n'
+        elif scenario=='L21' and '18' in Cell_LocalId_list and '19' not in Cell_LocalId_list and '20' not in Cell_LocalId_list and len(RET2100_list_new)==1 and len(RET2100_list_legacy)==0
+            output+='OK\n'
+        elif scenario=='L21' and '18' in Cell_LocalId_list and '19' not in Cell_LocalId_list and '20' not in Cell_LocalId_list and len(RET2100_list_new)==0 and len(RET2100_list_legacy)==1
+            output+='OK\n'
+        elif scenario=='L21' and '18' in Cell_LocalId_list and '19' not in Cell_LocalId_list and '20' not in Cell_LocalId_list and len(RET2100_list_new)==0 and len(RET2100_list_legacy)==0 and len(RET2100_list_only1800ret)==1
+            output+='OK\n'
+        else
+            if scenario=='L21'
+                flagret2100=0
+            end
+        end
+        if scenario=='L21' and flagret2100==0
+            output+='<<Check manually!>>\n'
+        end
+        
+        for i in range(0,len(Dspret_deviceno_list))
+            if scenario=='L26' and  '4' in Cell_LocalId_list
+                if Dspret_deviceno_list[i]=='4' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S4' and Dspretsubunit_subunitname_list[i]==ne_name[0]+'XL'+ne_name[3::]+'E' and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE'
+                    RET2600_list.append('1')
+                    end
+                if Dspret_deviceno_list[i]=='14' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S14' and Dspretsubunit_subunitname_list[i]==ne_name[3::]+'E' and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE'
+                    RET2600_list_2nd.append('1')
+                    end
+            end
+            if scenario=='L26' and  '5' in Cell_LocalId_list
+                if Dspret_deviceno_list[i]=='5' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S5' and Dspretsubunit_subunitname_list[i]==ne_name[0]+'XL'+ne_name[3::]+'F' and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE'
+                    RET2600_list.append('1')
+                    end
+                if Dspret_deviceno_list[i]=='15' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S15' and Dspretsubunit_subunitname_list[i]==ne_name[3::]+'F' and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE'
+                    RET2600_list_2nd.append('1')
+                    end
+            end
+            if scenario=='L26' and  '6' in Cell_LocalId_list
+                if Dspret_deviceno_list[i]=='6' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S6' and Dspretsubunit_subunitname_list[i]==ne_name[0]+'XL'+ne_name[3::]+'G' and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE'
+                    RET2600_list.append('1')
+                    end
+                if Dspret_deviceno_list[i]=='16' and Dspret_devicename_list[i]==ne_name[0]+'XL'+ne_name[3::]+'S16' and Dspretsubunit_subunitname_list[i]==ne_name[3::]+'G' and Dspretsubunit_onlinestatus_list[i]=='AVAILABLE'
+                    RET2600_list_2nd.append('1')
+                    end
+            end
+        end
+        if scenario=='L26' and '4' in Cell_LocalId_list and '5' in Cell_LocalId_list and '6' in Cell_LocalId_list and len(RET2600_list)==3 and len(RET2600_list_2nd)==3
+            output+='OK\n'
+        elif scenario=='L26' and '4' in Cell_LocalId_list and '5' in Cell_LocalId_list and '6' in Cell_LocalId_list and len(RET2600_list)==3 and len(RET2600_list_2nd)==0 and len(Cell_2600_4t4t_list)==0
+            output+='OK\n'
+        elif scenario=='L26' and '4' in Cell_LocalId_list and '5' in Cell_LocalId_list and '6' in Cell_LocalId_list and len(RET2600_list)==3 and len(RET2600_list_2nd)!=3 and len(Cell_2600_4t4t_list)==3
+              output+='OK, check 2nd ret 2600\n'  
+        
+        elif scenario=='L26' and '4' in Cell_LocalId_list and '5' in Cell_LocalId_list and '6' not in Cell_LocalId_list and len(RET2600_list)==2 and len(RET2600_list_2nd)==2
+            output+='OK\n'
+        elif scenario=='L26' and '4' in Cell_LocalId_list and '5' in Cell_LocalId_list and '6' not in Cell_LocalId_list and len(RET2600_list)==2 and len(RET2600_list_2nd)==0 and len(Cell_2600_4t4t_list)==0
+            output+='OK\n'
+        elif scenario=='L26' and '4' in Cell_LocalId_list and '5' in Cell_LocalId_list and '6' not in Cell_LocalId_list and len(RET2600_list)==2 and len(RET2600_list_2nd)!=2 and len(Cell_2600_4t4t_list)==2
+            output+='OK, check 2nd ret 2600\n'
+
+        elif scenario=='L26' and '4' in Cell_LocalId_list and '5' not in Cell_LocalId_list and '6' not in Cell_LocalId_list and len(RET2600_list)==1 and len(RET2600_list_2nd)==1
+            output+='OK\n'
+        elif scenario=='L26' and '4' in Cell_LocalId_list and '5' not in Cell_LocalId_list and '6' not in Cell_LocalId_list and len(RET2600_list)==1 and len(RET2600_list_2nd)==0 and len(Cell_2600_4t4t_list)==0
+            output+='OK\n'
+        elif scenario=='L26' and '4' in Cell_LocalId_list and '5' not in Cell_LocalId_list and '6' not in Cell_LocalId_list and len(RET2600_list)==1 and len(RET2600_list_2nd)!=1 and len(Cell_2600_4t4t_list)==1
+            output+='OK, check 2nd ret 2600\n'
+        else
+            if scenario=='L26' 
+                flagret2600=0
+            end
+        end
+        if scenario=='L26' and flagret2600==0
+            output+='<<Check manually!>>\n'
+        end
+
+
+
+        output+='•	VSWR test on cells – '
+        vswr_lst7=[]
+        vswr_lst8=[]
+        vswr_lst9=[]
+        vswr_lst18=[]
+        vswr_lst21=[]
+        vswr_lst26=[]
+        Cmd_DspVswr=com('DSP VSWR:;',0,'Cabinet No.','Subrack No.','Slot No.','TX Channel No.','VSWR(0.01)','Vswr Test Time')
+        Cab_vswr_list=Cmd_DspVswr[0]
+        Subrack_vswr_list=Cmd_DspVswr[1]
+        Slot_vswr_list=Cmd_DspVswr[2][0]
+        Tx_Channel_list=Cmd_DspVswr[2][1]
+        VSWR_value_list=Cmd_DspVswr[2][2]
+        VSWR_test_time_list=Cmd_DspVswr[2][3]
+        vswr_scenarios_ok=[['1','1'],['1','0','1','0'],['0','1','0','1'],['1','1','1','1'],['1', '0', '1', '0', '1', '0', '1', '0', '1', '0', '1', '0'],['1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1'],['1', '1', '0', '0', '1', '1', '0', '0', '1', '1', '0', '0'],['0', '1', '0', '1','0', '1', '0', '1','0', '1', '0', '1'],['1','1','1','1','1','1'],['1','0','1','0','1','0','1','0'],['1','1','1','1','1','1','1','1'],['0','1','0','1','0','1','0','1']]
+        for i in range(0, len(Cab_vswr_list))
+            if scenario=='L7' and Subrack_vswr_list[i] in ['80','82','84','86'] and '90' not in Subrack_vswr_list  and VSWR_value_list[i][0]=='1' and len(VSWR_value_list[i])==3 and VSWR_value_list[i][1] not in ['4','5','6','7','8','9']
+                vswr_lst7.append('1')
+            elif scenario=='L7' and Subrack_vswr_list[i] in ['80','82','84','86'] and '90' not in Subrack_vswr_list 
+                vswr_lst7.append('0')
+            end
+            if scenario=='L7' and Subrack_vswr_list[i] in ['90','91','92','93']   and VSWR_value_list[i][0]=='1' and len(VSWR_value_list[i])==3 and VSWR_value_list[i][1] not in ['4','5','6','7','8','9']
+                vswr_lst7.append('1')
+            elif scenario=='L7' and Subrack_vswr_list[i] in ['90','91','92','93']  
+                vswr_lst7.append('0')
+            end
+            if scenario=='L8' and Subrack_vswr_list[i] in ['80','82','84','86']  and '60' not in Subrack_vswr_list  and VSWR_value_list[i][0]=='1' and len(VSWR_value_list[i])==3 and VSWR_value_list[i][1] not in ['4','5','6','7','8','9']
+                vswr_lst8.append('1')
+            elif scenario=='L8' and Subrack_vswr_list[i] in ['80','82','84','86']  and '60' not in Subrack_vswr_list 
+                vswr_lst8.append('0')
+            end
+            if scenario=='L8' and Subrack_vswr_list[i] in ['60','61','62','63']  and VSWR_value_list[i][0]=='1' and len(VSWR_value_list[i])==3 and VSWR_value_list[i][1] not in ['4','5','6','7','8','9']
+                vswr_lst8.append('1')
+            elif scenario=='L8' and Subrack_vswr_list[i] in ['60','61','62','63'] 
+                vswr_lst8.append('0')
+            end
+            if scenario=='L9' and Subrack_vswr_list[i] in ['80','82','84','86']   and VSWR_value_list[i][0]=='1' and len(VSWR_value_list[i])==3 and VSWR_value_list[i][1] not in ['4','5','6','7','8','9']
+                vswr_lst9.append('1')
+            elif scenario=='L9' and Subrack_vswr_list[i] in ['80','82','84','86']  
+                vswr_lst9.append('0')
+            end
+            if scenario=='L18' and Subrack_vswr_list[i] in ['67','68','69']    and VSWR_value_list[i][0]=='1' and len(VSWR_value_list[i])==3 and VSWR_value_list[i][1] not in ['4','5','6','7','8','9']
+                vswr_lst18.append('1')
+            elif scenario=='L18' and Subrack_vswr_list[i] in ['67','68','69']   
+                vswr_lst18.append('0')
+            end
+            if scenario=='L18' and Subrack_vswr_list[i] in ['100','101','102','103']  and '67' not in Subrack_vswr_list  and VSWR_value_list[i][0]=='1' and len(VSWR_value_list[i])==3 and VSWR_value_list[i][1] not in ['4','5','6','7','8','9']
+                vswr_lst18.append('1')
+            elif scenario=='L18' and Subrack_vswr_list[i] in ['100','101','102','103']  and '67' not in Subrack_vswr_list 
+                vswr_lst18.append('0')
+            end
+            if scenario=='L21' and Subrack_vswr_list[i] in ['100','101','102','103']   and VSWR_value_list[i][0]=='1' and len(VSWR_value_list[i])==3 and VSWR_value_list[i][1] not in ['4','5','6','7','8','9']
+                vswr_lst21.append('1')
+            elif scenario=='L21' and Subrack_vswr_list[i] in ['100','101','102','103']  
+                vswr_lst21.append('0')
+            end
+            if scenario=='L26' and Subrack_vswr_list[i] in ['64','65','66']   and VSWR_value_list[i][0]=='1' and len(VSWR_value_list[i])==3 and VSWR_value_list[i][1] not in ['4','5','6','7','8','9']
+                vswr_lst26.append('1')
+            elif scenario=='L26' and Subrack_vswr_list[i] in ['64','65','66']  
+                vswr_lst26.append('0')
+            end
+        end
+        # Print(vswr_lst7)
+        # Print(vswr_lst8)
+        # Print(vswr_lst9)
+        # Print(vswr_lst18)
+        # Print(vswr_lst21)
+        # Print(vswr_lst26)
+        if scenario=='L7' and vswr_lst7 not in vswr_scenarios_ok
+            output+='<<check VSWR values>>'
+        elif scenario=='L7' and vswr_lst7  in vswr_scenarios_ok 
+            output+='OK'
+        end
+
+        if scenario=='L8' and vswr_lst8 not in vswr_scenarios_ok
+            output+='<<check VSWR values>>'
+        elif scenario=='L8' and vswr_lst8  in vswr_scenarios_ok 
+            output+='OK'
+        end
+
+        if scenario=='L9' and vswr_lst9 not in vswr_scenarios_ok
+            output+='<<check VSWR values>>'
+        elif scenario=='L9' and vswr_lst9  in vswr_scenarios_ok 
+            output+='OK'
+        end
+
+        if scenario=='L18' and vswr_lst18 not in vswr_scenarios_ok
+            output+='<<check VSWR values>>'
+        elif scenario=='L18' and vswr_lst18  in vswr_scenarios_ok 
+            output+='OK'
+        end
+        
+        if scenario=='L21' and vswr_lst21 not in vswr_scenarios_ok
+            output+='<<check VSWR values>>'
+        elif scenario=='L21' and vswr_lst21  in vswr_scenarios_ok 
+            output+='OK'
+        end
+
+        if scenario=='L26' and vswr_lst26 not in vswr_scenarios_ok
+            output+='<<check VSWR values>>'
+        elif scenario=='L26' and vswr_lst26  in vswr_scenarios_ok 
+            output+='OK'
+        end
+            
+
+
+        """"""
+        output+='\n\n•	Test calls result (attached) - \n'
+        output+='•	Cell lifecycle changed to “PRE-OPERATIVE” - \n'
+        output+='•	WLA : if needed – \n'
+    end
+    Print(Output+output)
+end
+
+
+def facc_5g(ne_name,scenario)
+    output=''
+    scenario=''
+    #test connection
+    if ConnectNE(ne_name)
+        output+='•	Site defined in MAE – OK\n'
+        
+    else
+        Print('Recheck server or NE Name')
+    end
+    Print('ToBeDeveloped')
+end
+form1 = CreateForm('\n', ['Confirm', 'Cancel'])
+Label(form1,80, "\nSite name")
+hEditNE = Edit(form1, 80)
+Enter(form1)
+choices = ['L700','L800','L900','L1800','L2100','L2600','NR35(TBD)']  
+caption = 'Scenario'  
+hRadio1=RadioBoxGroup(form1, 100, choices, caption,[1,[False]]) 
+
+
+Enter(form1)
+          
+userSelect = ShowForm(form1)
+
+if GetValue(hRadio1) == 0 
+    if userSelect=="Confirm"
+        ne1=GetValue(hEditNE)
+        #ne1.capitalize()
+        scenario='L7'
+        facc_4g(ne1,scenario)
+
+    end
+elif GetValue(hRadio1) == 1
+    if userSelect=="Confirm"
+        ne1=GetValue(hEditNE)
+        #ne1.capitalize()
+        scenario='L8'
+        facc_4g(ne1,scenario)
+    end
+elif GetValue(hRadio1) == 2
+    if userSelect=="Confirm"
+        ne1=GetValue(hEditNE)
+        #ne1.capitalize()
+        scenario='L9'
+        facc_4g(ne1,scenario)
+    end
+elif GetValue(hRadio1) == 3
+    if userSelect=="Confirm"
+        ne1=GetValue(hEditNE)
+        #ne1.capitalize()
+        scenario='L18'
+        facc_4g(ne1,scenario)
+    end
+elif GetValue(hRadio1) == 4
+    if userSelect=="Confirm"
+        ne1=GetValue(hEditNE)
+        #ne1.capitalize()
+        scenario='L21'
+        facc_4g(ne1,scenario)
+    end
+elif GetValue(hRadio1) == 5
+    if userSelect=="Confirm"
+        ne1=GetValue(hEditNE)
+        #ne1.capitalize()
+        scenario='L26'
+        facc_4g(ne1,scenario)
+    end
+elif GetValue(hRadio1) == 6
+    if userSelect=="Confirm"
+        ne1=GetValue(hEditNE)
+        #ne1.capitalize()
+        scenario='NR35'
+        facc_5g(ne1,scenario)
+    end
+end
+
+
+if userSelect == "Cancel"
+    userSelect = ShowForm(form1)
+end
+#main
+

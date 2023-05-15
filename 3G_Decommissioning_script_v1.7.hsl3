@@ -1,0 +1,948 @@
+# compt_3G_remove_script_v1.7
+
+
+
+# change with own MAE user and VDF email address
+opcox_user = 'vmihai1'
+vdf_mail = 'valentin.mihai@vodafone.com'
+
+
+
+# delete old files and folders
+for item in ListDir(opcox_user + '/3Gdec/')
+    Remove(opcox_user + '/3Gdec/' + item)
+    end
+
+
+
+MakeDirs(opcox_user + '/3Gdec/')
+path2 = GetCwd() + '/' + opcox_user + '/3Gdec/3G_CoMPT_decomm_1st part.txt'
+path3 = GetCwd() + '/' + opcox_user + '/3Gdec/3G_CoMPT_decomm_2nd part_SET NonConcurrent.txt'
+path4 = GetCwd() + '/' + opcox_user + '/3Gdec/3G_CoMPT_decomm_3rd part_ACT SOFTWARE.txt'
+path5 = GetCwd() + '/' + opcox_user + '/3Gdec/3G_decomm_list_of_UO.txt'
+path6 = GetCwd() + '/' + opcox_user + '/3Gdec/3G_CoMPT_Disconnected.txt'
+path60 = GetCwd() + '/' + opcox_user + '/3Gdec/3G_UO_Disconnected.txt'
+path7 = GetCwd() + '/' + opcox_user + '/3Gdec/3G_CoMPT_Multiple_BBU_same_name.txt'
+path8 = GetCwd() + '/' + opcox_user + '/3Gdec/3G_CoMPT_REFARMING_Checks.txt'
+path9 = GetCwd() + '/' + opcox_user + '/3Gdec/3G_UO_REFARMING_Checks.txt'
+path10=GetCwd() + '/' + opcox_user + '/3Gdec/3G_UO _ RMV UNODEBIP _ OPR BRDPWR.txt'
+path11=GetCwd() + '/' + opcox_user + '/3Gdec/3G_Remedy report.txt'
+path12=GetCwd() + '/' + opcox_user + '/3Gdec/3G_Dictucell.txt'
+path13=GetCwd() + '/' + opcox_user + '/3Gdec/3G_CoMPT_CLC_DISPOSED.txt'
+path14=GetCwd() + '/' + opcox_user + '/3Gdec/3G_UO_CLC_DISPOSED.txt'
+
+
+lst_3G_compt  = GetNELstByType('BTS3900')
+lst_3G_compt_last3dig=[it[3::] for it in lst_3G_compt]
+lst_3G_UO=GetNELstByType('BTS3900 WCDMA')
+lst_3G=lst_3G_UO+lst_3G_compt
+string1=''
+string_re='Remedy NE Name,Actual NE Name,MPT Scenario,Action\n'
+Open(path2,"a+").write('')
+Open(path5,"a+").write('')
+Open(path8, "a+").write('')
+Open(path9, "a+").write('')
+Open(path11, "a+").write(string_re)
+Open(path12, "a+").write('')
+Open(path13, "a+").write('')
+Open(path14, "a+").write('')
+#exception list for  multiple BBU with the same name
+lst_3G_compt_exceptions=['BB4X15','BB2X15','BB4337','BB2337','OB32A1','OB22A1','HB2721','HB3721','HB28U0','HB48U0']
+
+#Function definitions:
+def  com(comm,objIndex,col_name1,col_name2,*args)
+        SendMML(comm)
+        rpt=GetMMLReport(-1)
+        p=ParseMMLRpt(rpt)
+        col1=GetColumnByName(p, objIndex, col_name1, 0)
+        col2=GetColumnByName(p, objIndex, col_name2, 0)
+        other_columns_list=[GetColumnByName(p, objIndex, col, 0) for col in args]
+        return col1, col2, other_columns_list
+    end
+def WriteToAFile(f, string) 
+    if (IsFile(f)==False)
+        fp1 = Open(f,'a+')
+        #Print(f + ' file has been created!')
+        fp1.close()
+    end  
+    fp = Open(f, "a+")
+    fp.write(string)
+    fp.close()
+end
+def ucellsaving()
+    lst_rnc = GetNELstByType('BSC6900 UMTS') + GetNELstByType('BSC6910 UMTS')
+    dict_ucell={}
+    for item in lst_rnc
+        if ConnectNE(item)
+            Saving=com('LST UCELL:;',0,'Cell Name','NodeB Name')
+            Cell_Name_list=Saving[0]
+            NodeB_Name_list=Saving[1]
+            for itt in range(0,len(Cell_Name_list))
+                dict_ucell[Cell_Name_list[itt]]=(NodeB_Name_list[itt],item)
+                WriteToAFile(path12,Cell_Name_list[itt]+','+NodeB_Name_list[itt]+','+item+'\n')
+            end
+        end
+    end
+    #Print(dict_ucell)
+end
+
+            
+def rmvunodebipUO(lis)
+    lst_rnc = GetNELstByType('BSC6900 UMTS') + GetNELstByType('BSC6910 UMTS')
+    dict_rnc = {}
+    dict_nodeb = {}
+    NodeBs = []
+    NodeBid = []
+    for item in lst_rnc
+        if ConnectNE(item)
+            SendMML('LST UNODEB:LSTFORMAT=HORIZONTAL;')
+            rpt = GetMMLReport(-1)
+            p = ParseMMLRpt(rpt)
+            NodeBname = GetColumnByName(p,0,'NodeB Name')
+            NodeB_id = GetColumnByName(p,0,'NodeB ID')
+            dict_rnc[item]=NodeBname
+            NodeBs.extend(NodeBname)
+            NodeBid.extend(NodeB_id)
+        end
+
+    end
+    dict_nodeb = {NodeBs[i]:NodeBid[i] for i in range(0,len(NodeBs))}
+    for ne in lis
+        for k,v in dict_rnc.items()
+                
+                    if ne in v
+                        WriteToAFile(path10,'RMV UNODEBIP:IDTYPE=BYID,NODEBID='+dict_nodeb[ne]+';{'+k+'}' +'\n')
+                        if GetValue(Direct_delivery)==True
+                            ConnectNE(k)
+                            SendMML('RMV UNODEBIP:IDTYPE=BYID,NODEBID='+dict_nodeb[ne]+';')
+                            #added in 1.5
+                            #Sleep(3)
+                            #Print(DeleteNE([ne]))
+                            
+                            
+                        end
+                        
+                    end
+            end
+    end     
+end
+
+def cleanup_deleted()
+
+    list2=GetNELst()
+    # Print(list2)
+    deleted_list=[]
+    for node in list2
+        if '_deleted' in node
+            deleted_list.append(node)
+        end
+    end
+    Print(deleted_list)
+    DeleteNE(deleted_list)
+end
+
+####~DecideNE~
+#Not used in 1.2
+def decide_NE(lst0)
+    not_found_3G_list=[]
+    #decide the exact NE names:
+    for elem in lst0
+        if elem[2] != 'L' and elem[2] != '1' and elem[2] != 'V' and elem != '' and  elem[2] !='B' and elem != 'Unknown NE' # checking if 3rd char is '2' or '3'or '4' or 'U'
+            if elem in lst_3G
+                #lst.append(elem[0] +'B2'+elem[3::])
+                lst.append([elem,elem])  #####DECIDE WHO IS lst
+            elif elem not in lst_3G and elem[3::] in lst_3G_last3dig #some 3G node exists but it is not named as elem:
+                if elem[1:3]=='XU' and elem[0]+'B2'+elem[3::] in lst_3G and elem[0]+'AU'+elem[3::] not in lst_3G  and elem[0]+'BU'+elem[3::] not in lst_3G
+                    lst.append([elem,elem[0]+'B2'+elem[3::]])
+                elif elem[1:3]=='AU' and elem[0]+'B2'+elem[3::] in lst_3G and elem[0]+'XU'+elem[3::] not in lst_3G  and elem[0]+'BU'+elem[3::] not in lst_3G
+                    lst.append([elem,elem[0]+'B2'+elem[3::]])
+                else 
+                    lst.append([elem,'3G element not determined'])
+                    not_found_3G_list.append(elem)
+                    end
+            elif elem not in lst_3G and elem[3::] not in lst_3G_last3dig
+                not_found_3G_list.append(elem)
+                #continue
+                #WriteToAFile(path5, str(elem)+'\n')
+                
+            end
+        end
+    end
+    #Print(lst)
+    return lst,not_found_3G_list
+    end
+####~DecideNE~
+
+def refarming_check_UO(Lista_UO)
+    string_re=''
+    output_refarming_UO=''
+    def  com(comm,objIndex,col_name1,col_name2,*args)
+        SendMML(comm)
+        rpt=GetMMLReport(-1)
+        p=ParseMMLRpt(rpt)
+        col1=GetColumnByName(p, objIndex, col_name1, 0)
+        col2=GetColumnByName(p, objIndex, col_name2, 0)
+        other_columns_list=[GetColumnByName(p, objIndex, col, 0) for col in args]
+        return col1, col2, other_columns_list
+    end
+
+    for nE in Lista_UO
+        if ConnectNE(nE)
+            output_refarming_UO=''
+            B10=com('LST RRU:;',0,'RF Unit Working Mode','Cabinet No.','Subrack No.','Slot No.')
+            #A10_1=com('LST RRU:;','Subrack No.','Slot No.')
+            RF_Unit_Working_Mode=B10[0]
+
+            #['UMTS_LTE','UMTS_ONLY','UMTS_LTE_FDD_NR','GSM_ONLY','GSM_LTE','GSM_LTE_FDD_NB-IoT']
+            if 'UMTS_LTE' in RF_Unit_Working_Mode or 'UMTS_LTE_FDD_NR' in RF_Unit_Working_Mode
+                output_refarming_UO+='Refarming 2100 done: YES, '
+                #WriteToAFile(path8,+str(ne)+ 'Refarming 2100 done: YES, ' +'\n')
+            elif 'UMTS_LTE' not in RF_Unit_Working_Mode and 'UMTS_LTE_FDD_NR' not in RF_Unit_Working_Mode  and 'UMTS_ONLY' in RF_Unit_Working_Mode
+                output_refarming_UO+='Refarming 2100 done: NO, '
+                #WriteToAFile(path8,+str(ne)+ 'Refarming 2100 done: NO ' +'\n')
+            elif 'UMTS_LTE' not in RF_Unit_Working_Mode and 'UMTS_LTE_FDD_NR' not in RF_Unit_Working_Mode and 'UMTS_ONLY' not in RF_Unit_Working_Mode
+                if   'GSM_ONLY' in RF_Unit_Working_Mode or 'GSM_LTE' in RF_Unit_Working_Mode or 'GSM_LTE_FDD_NB-IoT' in RF_Unit_Working_Mode
+                    output_refarming_UO+= 'GO CoMPT, please ignore this line! '
+                    end
+            end
+
+            #BB28U6, BB2G26
+            B11=com('LST RET:;',0,'Device No.','Control Port Cabinet No.','Control Port Subrack No.','Control Port Slot No.')
+            #A11_1=com('LST RET:;','Control Port Subrack No.','Control Port Slot No.')
+            Ret_device_no=B11[0]
+            Ret_cabinet_no=B11[1]
+            Ret_subrack_no=B11[2][0]
+            Ret_slot_no=B11[2][1]
+            
+
+            if len(Ret_device_no)!=0
+                for item in range(0,len(Ret_device_no))
+                    output_refarming_UO=output_refarming_UO+'RET_device: '+Ret_device_no[item]+'; '
+                end
+            end
+
+            B12=com('LST TMA:;',0,'Device No.','Control Port Cabinet No.','Control Port Subrack No.','Control Port Slot No.')
+            #A12_1=com('LST TMA:;','Control Port Subrack No.','Control Port Slot No.')
+            Tma_device_no=B12[0]
+            Tma_cabinet_no=B12[1]
+            Tma_subrack_no=B12[2][0]
+            Tma_slot_no=B12[2][1]
+            if len(Tma_device_no)!=0
+                for item in range(0,len(Tma_device_no))
+                    output_refarming_UO=output_refarming_UO+'TMA_device: '+Tma_device_no[item]+'; '
+                end
+            end
+
+            output_refarming_UO+='\n'
+            WriteToAFile(path9,str(nE)+','+ output_refarming_UO)
+            #string_re+='Remedy NE Name,Actual NE Name,BBU Scenario,Action'
+            string_re+=dict_uo_ne2rem[nE]+','+nE+','+'UO'+','+'Delete UO by RMV UNODEBIP\n'
+        else
+            WriteToAFile(path9,str(nE)+',disconnected,\n')
+            WriteToAFile(path60,str(nE)+' UO node disconnected\n')
+            string_re+=dict_uo_ne2rem[nE]+','+nE+','+'UO'+','+'Disconnected ~ Delete UO by RMV UNODEBIP\n'
+        end
+    end
+    WriteToAFile(path11,string_re)
+end
+# Print(dict_b2_ne2rem)
+# Print(dict_b3_ne2rem)
+# Print(dict_b4_ne2rem)
+# Print(dict_uo_ne2rem)
+
+def remove_3g_from_COMPT()
+    RNC_devip1820=['172.27.114.28','172.27.128.28','172.27.128.29','172.27.128.30','172.27.114.124','172.27.128.124','172.27.128.125','172.27.128.126',\
+    '172.27.114.92','172.27.114.93','172.27.128.92','172.27.128.93','172.27.128.94','172.27.114.12','172.27.128.12','172.27.128.13','172.27.128.14',\
+    '172.27.128.60','172.27.128.61','172.27.128.76','172.27.128.77','172.27.128.78','172.27.114.108','172.27.114.109','172.27.128.108','172.27.128.109',\
+    '172.27.128.110','172.27.128.44','172.27.128.45','172.27.114.140','172.27.114.141','172.27.114.142','172.27.115.60','172.27.115.61','172.27.115.76',\
+    '172.27.115.116','172.27.129.60','172.27.129.61','172.27.129.62','172.27.129.92','172.27.129.93','172.27.129.94','172.27.129.76','172.27.129.77','172.27.129.78',\
+    '172.27.129.44','172.27.129.45','172.27.129.46','172.27.129.28','172.27.129.29','172.27.129.30','172.27.129.108','172.27.129.109','172.27.129.110','172.27.129.124',\
+    '172.27.129.125','172.27.129.126','172.27.130.44','172.27.130.124','172.27.128.220','172.27.128.221','172.27.114.204','172.27.114.205','172.27.114.206','172.27.128.188',\
+    '172.27.128.189','172.27.128.190','172.27.128.140','172.27.128.141','172.27.128.142','172.27.129.12','172.27.129.13','172.27.129.14','172.27.114.236','172.27.114.237',\
+    '172.27.114.238','172.27.128.236','172.27.128.237','172.27.128.238','172.27.128.172','172.27.128.173','172.27.128.174','172.27.114.220','172.27.114.221','172.27.114.222',\
+    '172.27.128.204','172.27.128.205','172.27.128.206','172.27.128.156','172.27.128.157','172.27.128.158','172.27.128.252','172.27.128.253','172.27.128.254','172.27.113.140',\
+    '172.27.113.141','172.27.113.142','172.27.129.140','172.27.129.141','172.27.129.142','172.27.113.204','172.27.113.205','172.27.113.206','172.27.129.204','172.27.129.205',\
+    '172.27.129.206','172.27.129.217','172.27.129.218','172.27.129.220','172.27.129.221','172.27.129.188','172.27.129.189','172.27.113.172','172.27.113.173','172.27.113.174',\
+    '172.27.129.172','172.27.129.173','172.27.129.174','172.27.113.156','172.27.113.157','172.27.113.158','172.27.129.156','172.27.129.157','172.27.129.158','172.27.129.252',\
+    '172.27.115.28']
+    string_re=''
+    def  com(comm,objIndex,col_name1,col_name2,*args)
+        SendMML(comm)
+        rpt=GetMMLReport(-1)
+        p=ParseMMLRpt(rpt)
+        col1=GetColumnByName(p, objIndex, col_name1, 0)
+        col2=GetColumnByName(p, objIndex, col_name2, 0)
+        other_columns_list=[GetColumnByName(p, objIndex, col, 0) for col in args]
+        return col1, col2, other_columns_list
+    end
+    string2=''
+    contor=0
+    contor_d=0
+    contor_GO=0
+    for ne in lista
+        if ConnectNE(ne)
+            if ne in lst_3G_compt   
+                # WriteToAFile(path2,'//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n')
+                # WriteToAFile(path2,'CFM CB:NAME="3G_decomm",AUTORBKSW=DISABLE;'+' {'+str(ne)+'}' + '\n')
+
+                A1=com('LST APP:;',0,'Application ID','Application Type')
+                Application_ID=A1[0]
+                Application_Type=A1[1]
+                for item in range(0,len(Application_ID))
+                    if Application_Type[item]=='NodeB'
+                        contor+=1
+                        WriteToAFile(path2,'//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n')
+                        WriteToAFile(path2,'CFM CB:NAME="3G_decomm",AUTORBKSW=DISABLE;'+' {'+str(ne)+'}' + '\n')
+                        if GetValue(Direct_delivery)==True
+                            SendMML('CFM CB:NAME="3G_decomm",AUTORBKSW=DISABLE;')
+                            end
+                        WriteToAFile(path2, 'RMV APP:AID='+str(Application_ID[item])+';'+' {'+str(ne)+'}' + '\n')
+                        if GetValue(Direct_delivery)==True
+                            SendMML('RMV APP:AID='+str(Application_ID[item])+';')
+                            end
+                        if ne in dict_b2_ne2rem.keys()
+                            string_re+=dict_b2_ne2rem[ne]+','+ne+','+'GU CoMPT'+','+'Delete U part of GU node\n'
+                        elif ne in dict_b3_ne2rem.keys()
+                            string_re+=dict_b3_ne2rem[ne]+','+ne+','+'GU CoMPT'+','+'Delete U part of GU node\n'
+                        elif ne in dict_b4_ne2rem.keys() 
+                            string_re+=dict_b4_ne2rem[ne]+','+ne+','+'GU CoMPT'+','+'Delete U part of GU node\n'
+                        end
+
+                    end
+                end
+
+                # variables initialized at every new compt with something
+                NH_iub='something' 
+                SCTP_iub_ip='something'
+                Iub_ip='something'
+                output_refarming=''
+
+                #SendMML('LST IPPMSESSION:;')
+                A2=com('DSP IPPMSESSION:;',0,'IP Path ID','Session ID','Peer IP')
+                IPPM_IP_Path_ID=A2[0]
+                IPPM_Session_ID=A2[1]
+                IPPM_Peer_IP=A2[2][0]
+                for item in range(0,len(IPPM_IP_Path_ID))
+                    if IPPM_IP_Path_ID[item]!='100' and IPPM_Peer_IP[item] in RNC_devip1820
+                        WriteToAFile(path2, 'RMV IPPMSESSION:IPPMSN='+str(IPPM_Session_ID[item])+';'+' {'+str(ne)+'}' + '\n')
+                        if GetValue(Direct_delivery)==True
+                            SendMML('RMV IPPMSESSION:IPPMSN='+str(IPPM_Session_ID[item])+';')
+                            end
+                    end
+                    
+                end
+                #SendMML('LST IPPATH:;')
+                A3=com('LST IPPATH:;',0,'Path ID','Local IP Address','Peer IP Address','Description')
+                #Print(A3)
+                #A3_1=com('LST IPPATH:;','Path ID','Description')
+                Path_ID=A3[0]
+                Local_IP_Address=A3[1]
+                Peer_IP_Address=A3[2][0]
+                Path_desription_info=A3[2][1]
+                for item in range(0,len(Path_ID))
+                    if Path_ID[item]!='100' and Peer_IP_Address[item] in RNC_devip1820
+                        Iub_ip=Local_IP_Address[item]
+                        WriteToAFile(path2, 'RMV IPPATH:PATHID='+str(Path_ID[item])+';'+' {'+str(ne)+'}' +' //'+ str(Path_desription_info[item])+'\n')
+                        if GetValue(Direct_delivery)==True
+                            SendMML('RMV IPPATH:PATHID='+str(Path_ID[item])+';')
+                            end
+                    end
+                end
+                
+                #need to make sure that VLANID 204 is always for IUB / 
+                #SendMML('LST VLANMAP:;')
+                A4=com('LST VLANMAP:;',0,'VLAN ID','Next Hop IP','VLAN ID','Mask')
+                #A4_1=com('LST VLANMAP:;','VLAN ID','Mask')
+                VLAN_ID=A4[0]
+                NH_IP=A4[1]
+                VLAN_Mask=A4[2][1]
+                
+                for item in range(0,len(VLAN_ID))
+                    if VLAN_ID[item]=='204'
+                        NH_iub=NH_IP[item]   # variable changed  if condition true
+                        WriteToAFile(path2, 'RMV VLANMAP:NEXTHOPIP="'+str(NH_IP[item])+'",MASK="'+str(VLAN_Mask[item])+'",FORCEEXECUTE=YES;'+' {'+str(ne)+'}' + '\n')
+                        if GetValue(Direct_delivery)==True
+                            SendMML('RMV VLANMAP:NEXTHOPIP="'+str(NH_IP[item])+'",MASK="'+str(VLAN_Mask[item])+'",FORCEEXECUTE=YES;')
+                            end
+                    end
+                end
+
+                #SendMML('LST IPRT:;')
+                A5=com('LST IPRT:;',0,'Route Index','Next Hop IP','Route Index','Description Info')
+                #A5_1=com('LST IPRT:;','Route Index','Description Info')
+                Route_Index=A5[0]
+                Next_Hop_IP=A5[1]
+                Desc_info=A5[2][1]
+                for item in range(0,len(Route_Index))
+                    if Next_Hop_IP[item]==NH_iub
+                        WriteToAFile(path2, 'RMV IPRT:RTIDX='+str(Route_Index[item])+',FORCEEXECUTE=YES;'+' {'+str(ne)+'}' +' //'+str(Desc_info[item])+'\n')
+                        if GetValue(Direct_delivery)==True
+                            SendMML('RMV IPRT:RTIDX='+str(Route_Index[item])+',FORCEEXECUTE=YES;')
+                            end
+                    end
+                end
+
+                # What happens with IUBCP // removed by RMV APP ?
+                #SendMML('LST SCTPLNK:;')
+                A6=com('LST SCTPLNK:;',0,'Link No.','First Local IP Address','Link No.','Local SCTP Port No.')
+                #A6_1=com('LST SCTPLNK:;','Link No.','Local SCTP Port No.')
+                SCTPLNK_no=A6[0]
+                SCTP_LOCAL_IP=A6[1]
+                SCTP_iub_port=A6[2][1]
+                A7=com('LST CPBEARER:;',0,'CP Bear No.','Link No.')
+                CP_Bear_No=A7[0]
+                Link_No=A7[1]
+                for item in range(0,len(SCTPLNK_no))
+                    if SCTP_iub_port[item]!='60100'
+                        SCTP_iub_ip=SCTP_LOCAL_IP[item]
+                        WriteToAFile(path2, 'RMV CPBEARER:CPBEARID='+str(CP_Bear_No[item])+',FLAG=MASTER;'+' {'+str(ne)+'}'+'\n')
+                        if GetValue(Direct_delivery)==True
+                            SendMML('RMV CPBEARER:CPBEARID='+str(CP_Bear_No[item])+',FLAG=MASTER;')
+                            end
+                        WriteToAFile(path2, 'RMV SCTPLNK:SCTPNO='+str(SCTPLNK_no[item])+';'+' {'+str(ne)+'}'+'\n')
+                        if GetValue(Direct_delivery)==True
+                            SendMML('RMV SCTPLNK:SCTPNO='+str(SCTPLNK_no[item])+';')
+                            end
+                    end
+                end
+                
+                #SendMML('LST DEVIP:;')
+
+                A8=com('LST DEVIP:;',0,'IP Address','Subrack No.','Port No.','User Label')
+                #A8_1=com('LST DEVIP:;','Port No.','User Label')
+                DEVIP_iub_ip=A8[0]
+                Subrack_no=A8[1]
+                ETH_port=A8[2][0]
+                Devip_User_label=A8[2][1]
+                for item in range(0,len(DEVIP_iub_ip))
+                    if DEVIP_iub_ip[item] ==SCTP_iub_ip and DEVIP_iub_ip[item]==Iub_ip
+                        WriteToAFile(path2, 'RMV DEVIP:SRN='+str(Subrack_no[item])+',SN=7,SBT=BASE_BOARD,PT=ETH,PN='+str(ETH_port[item])+',IP="'+str(DEVIP_iub_ip[item])+'";'+' {'+str(ne)+'}'+' //'+str(Devip_User_label[item])+'\n')
+                        if GetValue(Direct_delivery)==True
+                            SendMML('RMV DEVIP:SRN='+str(Subrack_no[item])+',SN=7,SBT=BASE_BOARD,PT=ETH,PN='+str(ETH_port[item])+',IP="'+str(DEVIP_iub_ip[item])+'";')
+                        end
+                    end
+                end    
+
+                #SendMML('LST BASEBANDEQM:;')
+                A9=com('LST BASEBANDEQM:;',0,'Baseband Equipment ID','Baseband Equipment Type')
+                Baseband_Equipment_ID=A9[0]
+                Baseband_Equipment_Type_0=A9[1]
+                #Baseband_Equipment_Type=[eq for eq in Baseband_Equipment_Type_0 if eq!='Combined UL and DL']
+                Baseband_Equipment_Type=[eq if eq!='Combined UL and DL' else 'ULDL' for eq in Baseband_Equipment_Type_0]
+                for item in range(0,len(Baseband_Equipment_ID))                
+                    WriteToAFile(path2, 'RMV BASEBANDEQM:BASEBANDEQMID='+str(Baseband_Equipment_ID[item])+',BASEBANDEQMTYPE='+str(Baseband_Equipment_Type[item])+';'+' {'+str(ne)+'}' +'\n')
+                    if GetValue(Direct_delivery)==True
+                        SendMML('RMV BASEBANDEQM:BASEBANDEQMID='+str(Baseband_Equipment_ID[item])+',BASEBANDEQMTYPE='+str(Baseband_Equipment_Type[item])+';')
+                    end
+                end
+
+                #SECTOREQM, SECTOR, ULOCELLSECTOREQM
+
+                #SendMML('LST RRU:;')
+                A10=com('LST RRU:;',0,'RF Unit Working Mode','Cabinet No.','Subrack No.','Slot No.')
+                #A10_1=com('LST RRU:;','Subrack No.','Slot No.')
+                RF_Unit_Working_Mode=A10[0]
+                #Print(RF_Unit_Working_Mode)
+                RRU_Cabinet_no=A10[1]
+                RRU_Subrack_no=A10[2][0]
+                RRU_Slot_no=A10[2][1]
+                RRU_Cabinet_no_2100=[]
+                RRU_Subrack_no_2100=[]
+                RRU_Slot_no_2100=[]
+                #['UMTS_LTE','UMTS_ONLY','UMTS_LTE_FDD_NR','GSM_ONLY','GSM_LTE','GSM_LTE_FDD_NB-IoT']
+                if 'UMTS_LTE' in RF_Unit_Working_Mode or 'UMTS_LTE_FDD_NR' in RF_Unit_Working_Mode
+                    output_refarming+='Refarming 2100 done: YES, '
+                    #WriteToAFile(path8,+str(ne)+ 'Refarming 2100 done: YES, ' +'\n')
+                elif 'UMTS_LTE' not in RF_Unit_Working_Mode and 'UMTS_LTE_FDD_NR' not in RF_Unit_Working_Mode  and 'UMTS_ONLY' in RF_Unit_Working_Mode
+                    output_refarming+='Refarming 2100 done: NO, '
+                    #WriteToAFile(path8,+str(ne)+ 'Refarming 2100 done: NO ' +'\n')
+                elif 'UMTS_LTE' not in RF_Unit_Working_Mode and 'UMTS_LTE_FDD_NR' not in RF_Unit_Working_Mode and 'UMTS_ONLY' not in RF_Unit_Working_Mode
+                    if   'GSM_ONLY' in RF_Unit_Working_Mode or 'GSM_LTE' in RF_Unit_Working_Mode or 'GSM_LTE_FDD_NB-IoT' in RF_Unit_Working_Mode
+                        output_refarming+= 'GO CoMPT, please ignore this line! '
+                        contor_GO+=1
+                        end
+                end
+
+                for item in range(0,len(RRU_Subrack_no))
+                    if 'UMTS' in RF_Unit_Working_Mode[item]
+                        RRU_Cabinet_no_2100.append(RRU_Cabinet_no[item])
+                        RRU_Subrack_no_2100.append(RRU_Subrack_no[item])
+                        RRU_Slot_no_2100.append(RRU_Slot_no[item])
+                        
+                    end
+                end
+                # Print(RRU_Cabinet_no_2100)
+                # Print(RRU_Subrack_no_2100)
+                # Print(RRU_Slot_no_2100)
+                #Print(RRU_Subrack_no_2100)
+
+
+                #BB28U6, BB2G26
+                A11=com('LST RET:;',0,'Device No.','Control Port Cabinet No.','Control Port Subrack No.','Control Port Slot No.')
+                #A11_1=com('LST RET:;','Control Port Subrack No.','Control Port Slot No.')
+                Ret_device_no=A11[0]
+                Ret_cabinet_no=A11[1]
+                Ret_subrack_no=A11[2][0]
+                Ret_slot_no=A11[2][1]
+                
+                # Print(Ret_device_no)
+                # Print(Ret_cabinet_no)
+                # Print(Ret_subrack_no)
+                # Print(Ret_slot_no)
+                if len(Ret_device_no)!=0
+                    for item in range(0,len(Ret_device_no))
+                        if Ret_subrack_no[item] in RRU_Subrack_no_2100 and Ret_cabinet_no[item] in RRU_Cabinet_no_2100 and Ret_slot_no[item] in RRU_Slot_no_2100
+                            output_refarming=output_refarming+'RET_device: '+Ret_device_no[item]+'; '
+                            WriteToAFile(path2, 'RMV RET:DEVICENO='+Ret_device_no[item]+';'+' {'+str(ne)+'}'+'\n')
+                            if GetValue(Direct_delivery)==True
+                                SendMML('RMV RET:DEVICENO='+Ret_device_no[item]+';')
+                            end
+                        end
+                    end
+                end
+
+                A12=com('LST TMA:;',0,'Device No.','Control Port Cabinet No.','Control Port Subrack No.','Control Port Slot No.')
+                #A12_1=com('LST TMA:;','Control Port Subrack No.','Control Port Slot No.')
+                Tma_device_no=A12[0]
+                Tma_cabinet_no=A12[1]
+                Tma_subrack_no=A12[2][0]
+                Tma_slot_no=A12[2][1]
+                if len(Tma_device_no)!=0
+                    for item in range(0,len(Tma_device_no))
+                        if Tma_subrack_no[item] in RRU_Subrack_no_2100 and Tma_cabinet_no[item] in RRU_Cabinet_no_2100 and Tma_slot_no[item] in RRU_Slot_no_2100
+                            output_refarming=output_refarming+'TMA_device: '+Tma_device_no[item]+'; '
+                            WriteToAFile(path2, 'RMV TMA:DEVICENO='+Tma_device_no[item]+';'+' {'+str(ne)+'}'+'\n')
+                            if GetValue(Direct_delivery)==True
+                                SendMML('RMV TMA:DEVICENO='+Tma_device_no[item]+';')
+                            end
+                        end
+                    end
+                end
+
+                output_refarming+='\n'
+                WriteToAFile(path8,str(ne)+','+ output_refarming)
+
+                if len(RRU_Cabinet_no_2100) !=0
+                    for item in range(0,len(RRU_Cabinet_no_2100))
+                        WriteToAFile(path2, 'RMV RRU:CN='+str(RRU_Cabinet_no_2100[item])+',SRN='+str(RRU_Subrack_no_2100[item])+',SN='+str(RRU_Slot_no_2100[item])+';'+' {'+str(ne)+'}'+'\n')
+                        if GetValue(Direct_delivery)==True
+                            SendMML('RMV RRU:CN='+str(RRU_Cabinet_no_2100[item])+',SRN='+str(RRU_Subrack_no_2100[item])+',SN='+str(RRU_Slot_no_2100[item])+';')
+                        end
+                    end
+                end
+
+                #SendMML(LST RRUCHAIN:;)
+                A13=com('LST RRUCHAIN:;',0,'Chain No.','Head Slot No.')
+                Chain_no=A13[0]
+                Chain_head_slot_no=A13[1]
+                for item in range(0, len(Chain_no))
+                    if Chain_head_slot_no[item] =='3'
+                        WriteToAFile(path2, 'RMV RRUCHAIN:RCN='+str(Chain_no[item])+';'+' {'+str(ne)+'}'+'\n')
+                        if GetValue(Direct_delivery)==True
+                            SendMML('RMV RRUCHAIN:RCN='+str(Chain_no[item])+';')
+                        end
+                    end
+                end
+
+                #SendMML(DSP BRD:;)
+                A14=com('DSP BRD:;',0,'Cabinet No.','Slot No.','Config Type','Availability Status')
+                #A14_1=com('DSP BRD:;','Config Type','Availability Status')
+                Brd_cab_no=A14[0]
+                Brd_subrack_no=Subrack_no
+                Brd_slot_no=A14[1]
+                Brd_Config_type=A14[2][0]
+                Brd_av_status=A14[2][1]
+                for item in range(0,len(Brd_slot_no))
+                    if Brd_slot_no[item] in ['0','1','3','2'] and Brd_Config_type[item] in ['WBBP','UBBP'] and Brd_av_status[item] not in ['Power off','Unconfigured, Power off','Uninstalled']
+                        WriteToAFile(path2, 'OPR BRDPWR:CN='+str(Brd_cab_no[item])+',SRN='+str(Brd_subrack_no[item])+',SN='+str(Brd_slot_no[item])+',SW=OFF,FOCPWROFF=YES;'+' {'+str(ne)+'}'+' //'+ str(Brd_Config_type[item])+'\n')
+                        if GetValue(Direct_delivery)==True
+                            SendMML('OPR BRDPWR:CN='+str(Brd_cab_no[item])+',SRN='+str(Brd_subrack_no[item])+',SN='+str(Brd_slot_no[item])+',SW=OFF,FOCPWROFF=YES;')
+                        end
+                    end
+                end
+                for item in range(0,len(Brd_slot_no))
+                    if Brd_slot_no[item] in ['0','1','3','2'] and Brd_Config_type[item] in ['WBBP','UBBP'] and Brd_av_status[item] not in ['Unconfigured','Unconfigured, Power off','Unconfigured, Communication lost']
+                        WriteToAFile(path2, 'RMV BRD:CN='+str(Brd_cab_no[item])+',SRN='+str(Brd_subrack_no[item])+',SN='+str(Brd_slot_no[item])+';'+' {'+str(ne)+'}'+' //'+ str(Brd_Config_type[item])+'\n')
+                        if GetValue(Direct_delivery)==True
+                            SendMML('RMV BRD:CN='+str(Brd_cab_no[item])+',SRN='+str(Brd_subrack_no[item])+',SN='+str(Brd_slot_no[item])+';')
+                        end
+                    end    
+                end 
+
+                #SendMML(LST SECTOREQM:;)
+                A15=com('LST SECTOREQM:;',1,'Sector Equipment ID','Cabinet No.','Subrack No.','Slot No.')
+                Sectoreqm_ID_2100=[]
+                Sector_Equipment_ID=A15[0]
+                Sector_eqm_cabinet_no=A15[1]
+                Sector_eqm_subrack_no=A15[2][0]
+                Sector_eqm_slot_no=A15[2][1]
+                for item in range(0,len(Sector_Equipment_ID))
+                    if Sector_eqm_cabinet_no[item] in RRU_Cabinet_no_2100 and Sector_eqm_subrack_no[item] in RRU_Subrack_no_2100 and Sector_eqm_slot_no[item] in RRU_Slot_no_2100
+                        Sectoreqm_ID_2100.append(Sector_Equipment_ID[item])
+                    end
+                end
+                Sectoreqm_ID_2100_unique=[]
+                for item1 in Sectoreqm_ID_2100
+                    if item1 not in Sectoreqm_ID_2100_unique
+                        Sectoreqm_ID_2100_unique.append(item1)
+                    end
+                end
+                for item2 in Sectoreqm_ID_2100_unique
+                    WriteToAFile(path2, 'RMV SECTOREQM:SECTOREQMID='+str(item2)+';'+' {'+str(ne)+'}'+'\n')
+                    if GetValue(Direct_delivery)==True
+                        SendMML('RMV SECTOREQM:SECTOREQMID='+str(item2)+';')
+                    end
+                end
+                    
+                #Print(A15)
+                A16=com('LST SECTOREQM:;',0,'Sector Equipment ID','Sector ID')
+                Sec_eq_id=A16[0]
+                Sector_ID=A16[1]
+                Sector_ID_2100_unique=[]
+                for item in range(0,len(Sec_eq_id))
+                    if Sec_eq_id[item] in Sectoreqm_ID_2100_unique and Sector_ID[item] not in Sector_ID_2100_unique
+                        Sector_ID_2100_unique.append(Sector_ID[item])
+                    end
+                end
+                for item in range(0,len(Sector_ID_2100_unique))
+                    WriteToAFile(path2, 'RMV SECTOR:SECTORID='+str(Sector_ID_2100_unique[item])+';'+' {'+str(ne)+'}'+'\n')
+                    if GetValue(Direct_delivery)==True
+                        SendMML('RMV SECTOR:SECTORID='+str(Sector_ID_2100_unique[item])+';')
+                    end
+                end
+
+                ########2nd script#########
+
+                A20=com('LST NODE:;',0,'Working Mode','Software Version')
+                Working_mode=A20[0]
+                Soft_vers=A20[1]
+                for item in range(0,len(Working_mode))
+                    if Working_mode[item] =='ConCurrent'
+                        WriteToAFile(path3, 'SET NODE:WM=NON-CONCURRENT;'+' {'+str(ne)+'}'+'\n')
+                    else
+                        WriteToAFile(path3, '// Working Mode is already set to NON-CONCURRENT'+' {'+str(ne)+'}'+'\n')
+                    end
+                end
+                ########3rd script#########
+                #SendMML('ACT SOFTWARE:OT=NE,SWT=SOFTWARE,SV="BTS3900_5900 V100R016C10SPC200",ATL=GBTS;')
+                A21=com('LST SOFTWARE:;',0,'Storage Area','Application Type','Software Version')
+                Storage_Area=A21[0]
+                Application_Type=A21[1]
+                Application_Type_in_main_area=[]
+                SW_vers=A21[2][0]
+                for item in range(0,len(Application_Type))
+                    if Storage_Area[item]=='Main Area'
+                         Application_Type_in_main_area.append(Application_Type[item])
+                        end
+                        end
+                if 'NodeB' in Application_Type_in_main_area and 'GBTS' in Application_Type_in_main_area
+                    WriteToAFile(path4, 'ACT SOFTWARE:OT=NE,SWT=SOFTWARE,SV="'+Soft_vers[0]+'",ATL=GBTS;'+' {'+str(ne)+'}'+'\n')
+                elif 'NodeB' not in Application_Type_in_main_area and 'GBTS' in Application_Type_in_main_area
+                    WriteToAFile(path4, '// Only GBTS Application Type software in Main Area'+' {'+str(ne)+'}'+'\n')
+                    end
+                        #and Application_Type[item]=='NodeB'
+
+                #####################################################################################
+            end
+            
+        else
+            #Print(str(ne)+" - disconnected")
+            contor_d+=1
+            WriteToAFile(path6, str(ne)+' COMPT Node disconnected\n')
+            WriteToAFile(path8, str(ne)+',disconnected,\n')
+            if ne in dict_b2_ne2rem.keys()
+                string_re+=dict_b2_ne2rem[ne]+','+ne+','+'CoMPT'+','+'Disconnected\n'
+            elif ne in dict_b3_ne2rem.keys()
+                string_re+=dict_b3_ne2rem[ne]+','+ne+','+'CoMPT'+','+'Disconnected\n'
+            elif ne in dict_b4_ne2rem.keys() 
+                string_re+=dict_b4_ne2rem[ne]+','+ne+','+'CoMPT'+','+'Disconnected\n'
+            end
+        end
+    end
+    string2+="\nNumber of GU CoMPT in input file: "+str(contor)+'\n'
+    string2+="\nNumber of GO CoMPT in input file: "+str(contor_GO)+'\n'
+    string2+="\nNumber of disconnected CoMPT in input file: "+str(contor_d)+'\n'
+    WriteToAFile(path11,string_re)
+    return string2
+end
+
+# Print(dict_b2_ne2rem)
+# Print(dict_b3_ne2rem)
+# Print(dict_b4_ne2rem)
+# Print(dict_uo_ne2rem)
+
+def opr_brd(Lista1)
+    # Print(Lista1)
+    MntMode=''
+    for item1 in Lista1
+        if ConnectNE(item1) and item1 in lst_3G_UO
+            A143=com('LST MNTMODE:;',0,'Maintenance Mode','Start Time of Status Setting')
+            MntMode=A143[0][0]
+            A144=com('DSP BRD:;',0,'Cabinet No.','Slot No.','Config Type','Availability Status','Subrack No.')
+            #A14_1=com('DSP BRD:;','Config Type','Availability Status')
+            Brd_cab_no=A144[0]
+            Brd_subrack_no=A144[2][2]
+            Brd_slot_no=A144[1]
+            Brd_Config_type=A144[2][0]
+            Brd_av_status=A144[2][1]
+            if MntMode=='EXPAND'
+                for item in range(0,len(Brd_slot_no))
+                    if Brd_slot_no[item] in ['0','1','2','3'] and Brd_Config_type[item] in ['WBBP','UBBP'] 
+                        if Brd_av_status[item] not in ['Power off','Unconfigured, Power off','Uninstalled']
+                            # Print('OPR BRDPWR:CN='+str(Brd_cab_no[item])+',SRN='+str(Brd_subrack_no[item])+',SN='+str(Brd_slot_no[item])+',SW=OFF,FOCPWROFF=YES;'+' {'+str(item1)+'}'+' //'+ str(Brd_Config_type[item]))
+                            WriteToAFile(path10,'OPR BRDPWR:CN='+str(Brd_cab_no[item])+',SRN='+str(Brd_subrack_no[item])+',SN='+str(Brd_slot_no[item])+',SW=OFF,FOCPWROFF=YES;'+' {'+str(item1)+'}'+' //'+ str(Brd_Config_type[item])+'\n')
+                            if GetValue(Direct_delivery)==True 
+                                SendMML('OPR BRDPWR:CN='+str(Brd_cab_no[item])+',SRN='+str(Brd_subrack_no[item])+',SN='+str(Brd_slot_no[item])+',SW=OFF,FOCPWROFF=YES;')
+                            end
+                        end
+                        if Brd_av_status[item]=='Uninstalled'
+                            # Print('// '+item1+' slot' +Brd_slot_no[item]+' already uninstalled')
+                            WriteToAFile(path10,'// '+item1+' slot' +Brd_slot_no[item]+' already uninstalled'+'\n')
+                        end
+                        if Brd_av_status[item]=='Power off'
+                            # Print('// '+item1+' slot' +Brd_slot_no[item]+' already Power off')
+                            WriteToAFile(path10,'// '+item1+' slot' +Brd_slot_no[item]+' already Power off'+'\n')
+                        end
+                        if Brd_av_status[item]=='Unconfigured, Power off'
+                            # Print('// '+item1+' slot' +Brd_slot_no[item]+' already Power off')
+                            WriteToAFile(path10,'// '+item1+' slot' +Brd_slot_no[item]+' already Power off'+'\n')
+                        end
+                        
+                    end
+                end
+                WriteToAFile(path10,'ACT CFGFILE:MOD=LEAST,EFT=IMMEDIATELY;'+'{'+str(item1)+'}'+'\n')
+                if GetValue(Direct_delivery)==True
+                    SendMML('ACT CFGFILE:MOD=LEAST,EFT=IMMEDIATELY;')
+                end
+            else
+                # Print(item1 +' Not in Maintenance Mode, can report alarms!')
+                WriteToAFile(path10,'// '+item1 +' Not in Maintenance Mode, can report alarms!'+'\n')
+            end
+        elif ConnectNE(item1)==0 and item1 in lst_3G_UO
+
+            # Print(item1 +' not connected')
+            WriteToAFile(path10,'// '+item1 +' not connected'+'\n')
+
+        elif item1 not in lst_3G_UO
+            WriteToAFile(path10,'')
+            # Print(item1+'  not UO (GU or already decomm), no action needed here.')
+            # WriteToAFile(path10,'// '+item1+'  not UO (GU or already decomm)'+'\n')
+        end
+        MntMode==''
+    end
+end
+
+def mailreport()
+    #MAIL
+    Time_fj=''
+    loginInfo=CreateLoginInfo('10.0.72.45') 
+    mailInfo1=CreateMailInfo() 
+    mailInfo1['TO_ADDR'] = [vdf_mail]
+    # mailInfo1['CC_ADDR'] = ('')
+    mailInfo1['FROM_ADDR'] = opcox_user + '@ossadm.vfd2.de' 
+    if GetValue(Direct_delivery)==True
+        mailInfo1['MAIL_SUBJECT'] = 'MML EXECUTED!!! 3G Sunset RAN Automated Decommissioning Process' 
+    else
+        mailInfo1['MAIL_SUBJECT'] = '3G Sunset RAN Automated Decommissioning Process'
+    end
+    MAIL_BODY=string1+String2+"\n\n\n*****\n\n3G_CoMPT_decomm_1st part.txt\n- contains Task Management script for 3G decomm on GU CoMPT 2G+3G\n\n"+\
+    "3G_decomm_list_of_UO.txt\n- list of UO nodes ( BTS3900 WCDMA) from the input file (can be deleted with Delete NodeB in batches function)\n\n"+\
+    "3G_CoMPT_Disconnected.txt\n- list of GU nodes without management from the input file.\n\n"+"3G_UO_Disconnected.txt\n- list of UO nodes without management from the input file.\n\n"+\
+    "3G_CoMPT_Multiple_BBU_same_name.txt\n- list of GU/GO nodes with similar naming which can lead to a script execution conflict - are omitted from the algorithm\n\n"+\
+    "3G_UO _ RMV UNODEBIP _ OPR BRDPWR.txt\n- removing UnodeBIP of the RNC in order to delete UO node + BBP board power off\n\n"+\
+    "3G_Remedy Report\n- used for automated SRM response\n\n"
+
+
+    mailInfo1['MAIL_BODY'] = '\n\n'+MAIL_BODY
+    # mailInfo1['MAIL_ATTACH'] = [path2,path3,path4,path5,path6,path7,path8,path9,path10]
+    # mailInfo1['MAIL_ATTACH'] = [path2,path5,path6,path60,path7,path8,path9,path10,path11,path13,path14]
+    mailInfo1['MAIL_ATTACH'] = [path2,path5,path6,path60,path7,path10,path11]
+    result1=SendMail(mailInfo1)
+    Print('\n' + 'Mail sending: ')
+    Print(result1)
+    end
+
+#Main
+
+# form1 = CreateForm('3G Decommissioning process ', ['Confirm', 'Cancel','OPR BRD'])
+form1 = CreateForm('3G Decommissioning & Power Saving ', ['Confirm', 'Cancel'])
+Enter(form1)
+activateUoPowerSaving=CheckBox(form1, 450, "UO: Power OFF BBP boards\n\n",selected=True)
+
+Enter(form1)
+Label(form1, 180, ' \nSelect NE list file:')
+aa = FileChooser(form1, 'txt')
+# Enter(form1)
+# Label(form1, 180, ' \nSelect Cell DISPOSED database file:')
+# aaa=FileChooser(form1, 'txt')
+Enter(form1)
+#Print(GetValue(aaa))
+Enter(form1)
+Label(form1, 180, ' ')
+Enter(form1)
+Direct_delivery=CheckBox(form1, 450, "WARNING! Check this box ONLY for direct MML execution on all the selected sites!\n")
+
+
+
+userSelect = ShowForm(form1)
+#Print(GetValue(GetValue(Direct_delivery)))
+
+if userSelect == 'Confirm'
+    #ucellsaving()
+    Time_s=LocalTime()
+    Time_sj='-'.join(str(item) for item in Time_s[0:6])
+    Print("Start time: "+Time_sj)
+    
+    #ucell DB aggregation
+    # flag=0
+    # if GetValue(aaa)!=[]
+    #     ff=Open(GetValue(aaa))
+    #     list_DB_ucell=ff.read().splitlines()
+    #     # Print(list_DB_ucell[0])
+    #     # Print(list_DB_ucell[3000])
+    #     # Print(list_DB_ucell[27746])
+    #     list_DB_ucell_nodebextracted=[a[8:14] for a in list_DB_ucell]
+    #     list_DB_ucell_ucellextracted=[a[0:7] for a in list_DB_ucell]
+    #     #Print(list_DB_ucell_nodebextracted)
+    #     #Print(len(list_DB_ucell_nodebextracted))
+    #     #Print(list_DB_ucell_ucellextracted)
+    # else
+    #     flag=1
+    #     Print("No CLC exports generated.")
+    # end
+
+    #NE from input file aggregation
+    f = Open(GetValue(aa))
+    lst0 = [item.strip() for item in f.readlines()]
+    lst0=list(set(lst0))
+    string1+="\nNumber of nodes in input file: "+str(len(lst0))+'\n'
+    lst = []
+    lst_UO=[]
+    lst_3G_notUO=[]
+    dict_b2_ne2rem={}
+    dict_b3_ne2rem={}
+    dict_b4_ne2rem={}
+    dict_uo_ne2rem={}
+    for elem in lst0
+        #if elem[2] != 'L' and elem[2] != '1' and elem[2] != 'V' and elem != '' and elem[2] !='U' and elem[2] !='B' and elem[2] != 'Unknown NE'
+        if elem[2] != 'L' and elem[2] != '1' and elem[2] != 'V' and elem != '' and  elem[2] !='B' and elem != 'Unknown NE' # checking if 3rd char is '2' or '3'or '4' or 'U'
+            if elem[3::] in lst_3G_compt_last3dig and elem[0] +'B2'+elem[3::] in lst_3G_compt
+                lst.append(elem[0] +'B2'+elem[3::])
+                dict_b2_ne2rem[elem[0] +'B2'+elem[3::]]=elem
+                end
+            if elem[3::] in lst_3G_compt_last3dig and elem[0] +'B3'+elem[3::] in lst_3G_compt
+                lst.append(elem[0] +'B3'+elem[3::])
+                dict_b3_ne2rem[elem[0] +'B3'+elem[3::]]=elem
+                end
+            if elem[3::] in lst_3G_compt_last3dig and elem[0] +'B4'+elem[3::] in lst_3G_compt
+                lst.append(elem[0] +'B4'+elem[3::])
+                dict_b4_ne2rem[elem[0] +'B4'+elem[3::]]=elem
+                end
+            if elem in lst_3G_UO
+                lst_UO.append(elem)
+                dict_uo_ne2rem[elem]=elem
+                WriteToAFile(path5, str(elem)+'\n')
+            else 
+                lst_3G_notUO.append(elem)
+            end
+        end
+    end
+    #Print(lst_3G_notUO)
+
+    # Print(dict_b2_ne2rem)
+    # Print(dict_b3_ne2rem)
+    # Print(dict_b4_ne2rem)
+    # Print(dict_uo_ne2rem)
+    string1+="\nNumber of determined UO (Not CoMPT) NEs after checking input file: "+str(len(lst_UO))+"\n"
+
+    #Print(lst)
+    lista = []
+    WriteToAFile(path7, "")
+    WriteToAFile(path6, "")
+    WriteToAFile(path60, "")
+    WriteToAFile(path10,"")
+    for item in lst
+        if item in lst_3G_compt and item not in lst_3G_compt_exceptions
+            lista.append(item)
+        elif item in lst_3G_compt and item in lst_3G_compt_exceptions
+            WriteToAFile(path7, str(item)+'  NOT SURE ~~ Multiple BBU with the same name ~~ possible conflict!\n')
+        end
+    end
+    string1+="\nNumber of determined GO or GU CoMPT NEs after checking input file: "+str(len(lista))+"\n\n"
+
+    # At this point we succeeded to extract from input file: All CoMPT list: lista    --   All UO list:  lst_UO
+
+    #next function runs on UO list with argument <lst_UO>
+    Print('Generating UO refarming checks..')
+    refarming_check_UO(lst_UO)
+    Print('Generating UO RMV UNODEBIP script.. ')
+    Print('Generating UO brd power off script.. ')
+
+    if GetValue(activateUoPowerSaving) ==True
+        opr_brd(lst0)
+    end 
+    Sleep(4) # pause between brd power off and rmv unodebip
+    rmvunodebipUO(lst_UO)
+   
+
+    #next function runs on variable lista, from definition, without argument;
+    # needs to be last function to send email
+    Print('Generating CoMPT refarming checks..')
+    Print('Generating CoMPT 3G removal scripts..')
+    String2=remove_3g_from_COMPT()
+
+    #CLC disposed main operation:
+    # if flag==0
+    #     lst_determined_UO_Disc=[linie[0:6] for linie in Open(path60,'r').read().splitlines()]
+    #     #Print(lst_determined_UO_Disc)
+    #     lst_determined_compt_Disc_sufix=[linie[3:6] for linie in Open(path6,'r').read().splitlines()]
+    #     #Print(lst_determined_compt_Disc_sufix)
+    #     Print('Generating CLC Disposed reports..')
+    #     for element in range(0,len(list_DB_ucell_nodebextracted))
+    #         if list_DB_ucell_nodebextracted[element] in lst_3G_notUO and list_DB_ucell_nodebextracted[element][3::] not in lst_determined_compt_Disc_sufix
+    #             WriteToAFile(path13,list_DB_ucell_ucellextracted[element]+','+'DISPOSED'+'\n')
+    #             #Print("OK")
+    #             end
+    #         if list_DB_ucell_nodebextracted[element] in lst_UO and list_DB_ucell_nodebextracted[element] not in lst_determined_UO_Disc
+    #             WriteToAFile(path14,list_DB_ucell_ucellextracted[element]+','+'DISPOSED'+'\n')
+    #             #Print("NOK")
+    #             end
+    #     end
+    # end
+
+    mailreport()
+    
+
+    Print("\nDeleting _deleted UO Main Topology icons:\n")
+    
+    # Print([item+',' for item in lst_UO])
+    # if GetValue(Direct_delivery)==True
+    #     cleanup_deleted()
+    #     Sleep(3)
+    #     for ite in lst_UO
+    #         Sleep(1)
+            
+    #         # DeleteNE([ite])
+    #         # DeleteNE([ite+'_deleted'])
+    #         # DeleteNE([ite+'_deleted'])
+    #         # Print(DeleteNE([ite+'_deleted']))
+    #         # Print(DeleteNE([ite]))
+    #         end
+            
+    # else
+    #     Print("UO Main topology icons are not deleted before the RMV UNODEBIP execution.")
+    # end
+    Time_f=LocalTime()
+    Time_fj='-'.join(str(item) for item in Time_f[0:6])
+    Print("End time: "+Time_fj)
+    
+elif userSelect == 'Cancel'
+    userSelect = ShowForm(form1)
+
+end
+# elif userSelect == 'OPR BRD'
+#     f = Open(GetValue(aa))
+#     lst0 = [item.strip() for item in f.readlines()]
+#     Lista1=lst0
+#     opr_brd()
+# end
